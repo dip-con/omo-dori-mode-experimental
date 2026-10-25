@@ -1,0 +1,17 @@
+{
+ "//": "장도리 (리드방). Was jangdori-restart.sh: model/thinking files, RAG extension, tool allowlist. Fresh reset keeps no checkpoint (daily reset keeps context small).",
+ "label": "kakao-리드방",
+ "cwd": "/Volumes/Data",
+ "thread": "1000000000000000013",
+ "ext": [
+  "~/.omocat/kakao-lane-ext.ts"
+ ],
+ "tools": "kakao_send,kakao_recent,kakao_send_image,kakao_view_photo,kakao_profile_photo,jangdori_fix_request,web_search,generate_image,sa_stats,sa_clan_report,sa_contribution_skill,sa_titles,sa_compare,sa_last_match,jangdori_help,sa_member,sa_roster,sa_roster_changes,sa_chemi,sa_today_clanwar,sa_vs_clan,sa_golden_time,sa_goal,sa_growth,sa_condition,sa_weekly,sa_online,sa_rank_duo,sa_weekly_active,acme_docs_search,acme_docs_refs,acme_docs_make_docx,acme_quote_basis,acme_quote_build,acme_quote_adjust",
+ "modelFile": "~/.omocat/jangdori-model",
+ "modelDefault": "chatgpt-subscription/gpt-6-luna-fast",
+ "thinkingFile": "~/.omocat/jangdori-thinking",
+ "thinkingDefault": "off",
+ "noClaim": true,
+ "briefPath": "~/.omocat/jangdori-brief.md",
+ "checkpointOnReset": false
+}

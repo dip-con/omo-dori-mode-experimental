@@ -1,0 +1,9 @@
+{
+ "//": "Generic lane: model/thinking from the registry entry (else Opus 5.5 medium), no extra extensions or tool allowlist, done-claim rule on.",
+ "ext": [],
+ "tools": null,
+ "model": null,
+ "thinking": null,
+ "noClaim": false,
+ "briefPath": null
+}

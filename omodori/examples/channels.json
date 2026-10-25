@@ -1,0 +1,23 @@
+{
+  "//": "Discord project channels the listener maps to repos. Key = channel id. Optional session: relay messages into a long-lived herdr session instead of opening lanes.",
+  "category_id": "1000000000000000010",
+  "projects": {
+    "1000000000000000011": {
+      "key": "example-app",
+      "name": "Example App",
+      "path": "~/Work/example-app",
+      "repo": "github.com/your-org/example-app"
+    },
+    "1000000000000000012": {
+      "key": "notes",
+      "name": "Notes",
+      "path": "~/Work/notes",
+      "repo": "(local)",
+      "session": {
+        "mode": "herdr",
+        "key": "notes",
+        "note": "relay each Discord message with `bun ~/.omocat/sess.ts send notes \"[discord #notes] (msg <id>) <text>\"`; if closed, `sess.ts reopen notes`."
+      }
+    }
+  }
+}

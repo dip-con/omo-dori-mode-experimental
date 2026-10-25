@@ -1,0 +1,15 @@
+{
+  "gitlabActiveDays": 30,
+  "skipProjects": [
+    "your-user/omodori"
+  ],
+  "aliases": {
+    "example-app": "예시 앱"
+  },
+  "staleIssueDays": 3,
+  "localRepos": [
+    "~/Work/example-app"
+  ],
+  "uncommittedDays": 1,
+  "oldWorktreeDays": 14
+}

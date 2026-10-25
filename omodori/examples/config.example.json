@@ -1,0 +1,41 @@
+{
+  "//": "Copy to $OMOCAT_HOME/config.json (install.sh does this) and replace every example value. Fields left out use the defaults in config.ts. The ids below are fake; the test suite runs against this file.",
+  "discord": {
+    "guildId": "1000000000000000000",
+    "ownerId": "100000000000000099",
+    "generalChannel": "1000000000000000001",
+    "inboxChannel": "1000000000000000002",
+    "ceoThread": "1000000000000000003",
+    "buildThread": "1000000000000000004",
+    "wakeStatsThread": "1000000000000000005",
+    "relayUrl": ""
+  },
+  "kakao": {
+    "locoPort": 8397,
+    "healthChatId": "18000000000000003",
+    "ragChatIds": ["18000000000000001", "18000000000000005"],
+    "archiveRoot": "~/KakaoArchive",
+    "requestsLedger": "",
+    "ownerRoom": "주인 1:1",
+    "botUserId": "400000001",
+    "generatedImagesDir": "~/generated-images/",
+    "docOutDir": "~/.omocat/doc-out/",
+    "issueRefRooms": []
+  },
+  "launchd": {
+    "prefix": "com.example.dori",
+    "kakaoArchiveSync": "com.example.kakao-archive.sync",
+    "services": ["supervisor", "heartbeat", "decisions", "ceo-weekly", "repo-patrol", "kakao-live", "kakao-push", "kakao-health", "wake-filter-stats"]
+  },
+  "claudeAccounts": ["default", "alt", "work"],
+  "paths": {
+    "memoryRepo": "",
+    "disks": ["/"],
+    "genericCwds": ["/", "/Users", "~", "/Volumes", "/Volumes/Data", "/tmp", "/private/tmp"]
+  },
+  "git": {
+    "name": "",
+    "email": "",
+    "memoryRemote": ""
+  }
+}

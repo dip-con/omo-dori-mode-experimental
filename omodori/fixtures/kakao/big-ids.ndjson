@@ -1,0 +1,4 @@
+{"chat_id":18000000000000001,"is_from_me":false,"log_id":3946370721884362755,"message_type":1,"sender":"fx","sender_id":9007199254740993123,"text":"첫 줄","timestamp":"2026-10-23T08:00:00Z","type":"message"}
+{"chat_id":480000000000001,"is_from_me":false,"log_id":3946370721884362756,"message_type":1,"sender":"fx","sender_id":9007199254740993123,"text":"둘째방 줄","timestamp":"2026-10-23T08:00:00Z","type":"message"}
+{"chat_id":18000000000000001,"is_from_me":false,"log_id":9223372036854775807,"message_type":1,"sender":"fx","sender_id":9007199254740993123,"text":"최대 log_id","timestamp":"2026-10-23T08:00:00Z","type":"message"}
+{"chat_id":18000000000000001,"is_from_me":false,"log_id":394

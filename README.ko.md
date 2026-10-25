@@ -145,6 +145,10 @@ bunx tsc --noEmit  # 타입 검사
 
 실제 pane이나 저장소, GitHub는 건드리지 않아요.
 
+## Discord + 카카오톡 런타임 (omodori)
+
+[`omodori/`](omodori/README.md)는 도리가 Mac에서 상시 돌리는 런타임이다: Discord 봇, omo RPC 기반 lane supervisor, 카카오톡 실시간 수신과 방별 lane, 결정함, 자가 복구 heartbeat. 기기마다 다른 값은 `config.json` 하나에 모여 있고, `omodori/install.sh`가 의존성을 확인하고 LaunchAgent를 만든다(기본은 dry run). 새 PC 체크리스트: [`omodori/docs/PORTING.md`](omodori/docs/PORTING.md).
+
 ## 라이선스
 
 MIT
