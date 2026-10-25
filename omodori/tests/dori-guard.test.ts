@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { checkCommand, type GuardEnv } from '../dori-guard'
 
 const env = (pgrep: GuardEnv['pgrep'] = () => []): GuardEnv => ({
-  channels: new Map([['1000000000000000001', '#일반'], ['1000000000000000012', '#acme']]),
+  channels: new Map([['1000000000000000001', '#일반'], ['1000000000000000012', '#app']]),
   leadPane: 'wW:p6', leadTab: 'wW:t2', leadWorkspace: 'wW',
   protectedPids: new Set([90395, 19430, 500]),
   pgrep,
@@ -16,16 +16,16 @@ describe('channel guard', () => {
     expect(checkCommand('cd /tmp && dori launch x --thread=1000000000000000012', env())?.kind).toBe('channel')
   })
   test('sess.ts open with a project channel as thread is blocked', () => {
-    expect(checkCommand('bun ~/.omocat/sess.ts open k "L" /tmp brief.md 1000000000000000012', env())?.kind).toBe('channel')
+    expect(checkCommand('bun ~/.omodori/sess.ts open k "L" /tmp brief.md 1000000000000000012', env())?.kind).toBe('channel')
   })
   test('the channel-bound side-project session (and its migrations) may open in #사이드', () => {
     const e = env(); e.channels.set('1000000000000000011', '#side-project')
-    expect(checkCommand('bun ~/.omocat/sess.ts open side-project-m1 "L" /tmp h.md 1000000000000000011', e)).toBeNull()
-    expect(checkCommand('bun ~/.omocat/sess.ts open other "L" /tmp h.md 1000000000000000011', e)?.kind).toBe('channel')
+    expect(checkCommand('bun ~/.omodori/sess.ts open side-project-m1 "L" /tmp h.md 1000000000000000011', e)).toBeNull()
+    expect(checkCommand('bun ~/.omodori/sess.ts open other "L" /tmp h.md 1000000000000000011', e)?.kind).toBe('channel')
   })
   test('a real thread id passes', () => {
     expect(checkCommand('dori launch x --thread discord:1000000000000000006', env())).toBeNull()
-    expect(checkCommand('bun ~/.omocat/sess.ts open k "L" /tmp brief.md 1000000000000000006', env())).toBeNull()
+    expect(checkCommand('bun ~/.omodori/sess.ts open k "L" /tmp brief.md 1000000000000000006', env())).toBeNull()
   })
 })
 

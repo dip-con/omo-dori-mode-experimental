@@ -167,7 +167,7 @@ describe('router process', () => {
     mkdirSync(join(home, 'events'), { recursive: true })
     const all = [1, 2, 3, 4, 5].map((i) => ev(i))
     writeFileSync(file, `${all.join('\n')}\n`)
-    const env = { ...process.env, OMOCAT_HOME: home }
+    const env = { ...process.env, OMODORI_HOME: home }
     const p1 = Bun.spawn(['bun', ROUTER, '--events', file], { env, stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' })
     p1.stdin.write(`${all.slice(0, 3).join('\n')}\n`)
     await p1.stdin.flush()
@@ -187,7 +187,7 @@ describe('router process', () => {
   })
 
   test('--now: legacy sweep lines -> 1 DORI_ASK + 1 DORI_DIGEST (act 2, info 1)', async () => {
-    const p = Bun.spawn(['bun', ROUTER, '--now'], { env: { ...process.env, OMOCAT_HOME: fresh() }, stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' })
+    const p = Bun.spawn(['bun', ROUTER, '--now'], { env: { ...process.env, OMODORI_HOME: fresh() }, stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' })
     p.stdin.write('NUDGED x\nLANE_QUOTA_ALL k reset=unknown\nKAKAO_STALL push\nLANE_QUOTA k --to alt\n')
     await p.stdin.end()
     const lines = (await new Response(p.stdout).text()).split('\n').filter(Boolean)
@@ -219,8 +219,8 @@ describe('monitors-check survives lead session replacement', () => {
     writeFileSync(join(sessions, `${stamp(oldAt)}_aaaa-1111.jsonl`), `${JSON.stringify(reg)}\n`)
     writeFileSync(join(sessions, `${stamp(newAt)}_bbbb-2222.jsonl`), `${JSON.stringify({ type: 'session', timestamp: new Date(newAt).toISOString() })}\n`)
     writeFileSync(join(home, 'sessions-map.json'), JSON.stringify({
-      'dandori-lead-old': { key: 'dandori-lead-old', status: 'closed', sessionId: 'aaaa-1111', pane: 'wW:p6' },
-      'dandori-lead-new': { key: 'dandori-lead-new', status: 'open', sessionId: 'bbbb-2222', pane: 'wW:p6' },
+      'dori-lead-old': { key: 'dori-lead-old', status: 'closed', sessionId: 'aaaa-1111', pane: 'wW:p6' },
+      'dori-lead-new': { key: 'dori-lead-new', status: 'open', sessionId: 'bbbb-2222', pane: 'wW:p6' },
     }))
     copyFileSync(join(DIR, 'monitors.json'), join(home, 'monitors.json'))
     // the lead pane's foreground process is the replacement session; the monitors still hang off the previous session's process
@@ -230,7 +230,7 @@ describe('monitors-check survives lead session replacement', () => {
     if (opts.monitorsAlive) defs.monitors.forEach((d: any, i: number) => ps.push(`${1100 + i} 1000 /bin/bash -c ${d.match} x`))
     writeFileSync(join(bin, 'ps'), `#!/bin/sh\ncat <<'EOF'\n${ps.join('\n')}\nEOF\n`)
     chmodSync(join(bin, 'herdr'), 0o755); chmodSync(join(bin, 'ps'), 0o755)
-    return { OMOCAT_HOME: home, OMO_SESSIONS_DIR: join(home, 'sessions'), PATH: `${bin}:${process.env.PATH}` }
+    return { OMODORI_HOME: home, OMO_SESSIONS_DIR: join(home, 'sessions'), PATH: `${bin}:${process.env.PATH}` }
   }
   const run = (env: Record<string, string>) => {
     const p = Bun.spawnSync(['bun', join(DIR, 'monitors-check.ts'), '--once'], { env: { ...process.env, ...env }, stdout: 'pipe', stderr: 'pipe' })

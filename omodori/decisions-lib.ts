@@ -1,4 +1,4 @@
-// Decision inbox store: ~/.omocat/decisions.jsonl, one decision per line, rewritten under a lock.
+// Decision inbox store: ~/.omodori/decisions.jsonl, one decision per line, rewritten under a lock.
 // Used by decision.ts (CLI, digest, LaunchAgent tick) and decision-tools.ts (the lane tool decision_add).
 // Safety rule (주인 10-17): money / contract / customer-facing decisions always default to "보류";
 // a default is auto-applied only to reversible decisions.

@@ -1,13 +1,13 @@
-// OmOMeow Herdr sessions: one Herdr tab per piece of work, mapped to its Discord thread.
+// Herdr sessions: one Herdr tab per piece of work, mapped to its Discord thread.
 // Text always goes to panes as an argument list (never through a shell string).
 //   open <key> <label> <cwd> <brief-file> [thread-id]   new tab + OMO session (--session-id), send brief
 //   send <key> <text> [--id X] [--mode m] [--plan]      deliver text: rpc for keys in transport.json, else herdr (Dori rule 18)
 //   status <key> [--json]                                rpc get_state of the lane + the registry's endpoint cache
 //   receipt <key> <id>                                   persisted | absent from the session JSONL
 //   close <key> [--expect-tab T]                         close its tab (session id kept for reopen)
-//   reopen <key> [text]                                  new tab resuming the same OMO session (OMOMEOW_FRESH=1: new session)
+//   reopen <key> [text]                                  new tab resuming the same OMO session (OMODORI_FRESH=1: new session)
 //   list                                                 print the map
-// Redesign S3 (docs/dori-redesign/final.md §2.2): open/close/reopen run inside the lane's lifecycle lease
+// Redesign S3: open/close/reopen run inside the lane's lifecycle lease
 // (registry.ts withLaneLease) and write the map only through patchLane with a generation CAS.
 // Exit codes: 0 ok, 3 sent but no receipt yet, 4 refused (lease_held, tab_moved, rpc refusal), 6 held_elsewhere
 // (another live process holds the session file, nothing started).
@@ -18,9 +18,10 @@ import { receipt, rpc, transportFor } from './rpc'
 import { channelSessionAllowed, loadChannels } from './dori-guard'
 import { sessionDirSlug, sessionRoot } from './questions'
 import { addLineage, appendEvent, type Entry, LANE_KEY_RE, liveHolders, patchLane, paths, readMap, RegistryError, updateDoriLane, withLaneLease } from './registry'
+import { homeRef, cfg } from './config'
 
-const MODEL = process.env.OMOMEOW_MODEL ?? 'anthropic-subscription/claude-opus-5-5'
-const THINKING = process.env.OMOMEOW_THINKING ?? 'medium'
+const MODEL = process.env.OMODORI_MODEL ?? 'anthropic-subscription/claude-opus-5-5'
+const THINKING = process.env.OMODORI_THINKING ?? 'medium'
 
 const herdr = async (...args: string[]) => {
   const p = Bun.spawn(['herdr', ...args], { stdout: 'pipe', stderr: 'pipe' })
@@ -35,9 +36,9 @@ const herdrText = async (...args: string[]) => {
 }
 // Every handed-off brief tells the session how to claim done (Dori rule 19a).
 const claimRule = (key: string) =>
-  `[Dandori 규칙] 끝났다고 판단되면 근거와 함께 \`dori claim-done ${key} --evidence "<머지 SHA, 닫힌 이슈, 배포 SHA, 결과 파일>"\`로 완료를 주장해. Dandori가 5분 안에 근거를 직접 확인해서 닫거나(dori close), 이유와 함께 not-done으로 돌려보내. 커밋·푸시 안 된 작업이 있으면 닫히지 않아. 중간 보고는 \`[REPORT] ${key} | <milestone|blocker|question|done> | <내용>\` 형식으로 Dandori 창에 보내.`
+  `[${cfg.lead.name} 규칙] 끝났다고 판단되면 근거와 함께 \`dori claim-done ${key} --evidence "<머지 SHA, 닫힌 이슈, 배포 SHA, 결과 파일>"\`로 완료를 주장해. ${cfg.lead.name}가 5분 안에 근거를 직접 확인해서 닫거나(dori close), 이유와 함께 not-done으로 돌려보내. 커밋·푸시 안 된 작업이 있으면 닫히지 않아. 중간 보고는 \`[REPORT] ${key} | <milestone|blocker|question|done> | <내용>\` 형식으로 ${cfg.lead.name} 창에 보내.`
 
-// Every sess.ts session is also a dori lane (Done = approved <key>: Dandori verifies the claim, writes the approval, closes).
+// Every sess.ts session is also a dori lane (Done = approved <key>: the lead verifies the claim, writes the approval, closes).
 // The lane file is changed only under its per-key lock (registry.ts updateDoriLane, same protocol as dori Registry.update).
 const doriLane = async (e: Entry, briefText: string) => {
   const now = new Date().toISOString()
@@ -91,7 +92,7 @@ async function workspaceFor(cwd: string): Promise<string> {
 // cold start can draw the input box without ever holding the session (bokdong synthesis #6).
 export async function startOmo(pane: string, sessionId: string, key: string, cwd: string, opts: { timeoutMs?: number; pollMs?: number; root?: string } = {}) {
   if (!LANE_KEY_RE.test(key)) throw new Error(`bad lane key ${key}`)
-  await herdr('pane', 'run', pane, `OMOMEOW_LANE_KEY=${key} omo --model ${MODEL} --thinking ${THINKING} --session-id ${sessionId}${process.env.OMOMEOW_OMO_ARGS ? ` ${process.env.OMOMEOW_OMO_ARGS}` : ''}`)
+  await herdr('pane', 'run', pane, `OMODORI_LANE_KEY=${key} omo --model ${MODEL} --thinking ${THINKING} --session-id ${sessionId}${process.env.OMODORI_OMO_ARGS ? ` ${process.env.OMODORI_OMO_ARGS}` : ''}`)
   const timeoutMs = opts.timeoutMs ?? 90_000
   const holderProbe = join(opts.root ?? sessionRoot(), sessionDirSlug(cwd), 'probe')
   const until = Date.now() + timeoutMs
@@ -210,7 +211,7 @@ export async function reopenLane(deps: LifecycleDeps, a: { key: string; text: st
       if (!e) throw new Error(`unknown ${a.key}`)
       if (e.status === 'open') throw new Error(`${e.key} is still open in ${e.tab}`)
       const g = e.generation ?? 0
-      // OMOMEOW_FRESH=1 drops the old conversation (a long one slows every turn); the brief must carry the rules.
+      // OMODORI_FRESH=1 drops the old conversation (a long one slows every turn); the brief must carry the rules.
       const sessionId = a.fresh ? deps.newId() : e.sessionId
       const pre = a.fresh ? { path: null, refusal: null } : await holdersBefore(deps, e, sessionId)
       if (pre.refusal) return pre.refusal
@@ -248,14 +249,14 @@ const report = (o: Outcome) => {
 if (import.meta.main) {
   // KakaoTalk lanes are standing bots, not done-tracked work: no dori lane record (no nudges), and no claim/[REPORT]
   // rule, which they have no herdr access for and would post into the chat room instead.
-  const noClaim = process.env.OMOMEOW_NO_CLAIM === '1'
+  const noClaim = process.env.OMODORI_NO_CLAIM === '1'
   const [cmd, ...args] = process.argv.slice(2)
   const map = readMap()
   switch (cmd) {
     case 'open': {
       const [key, label, cwd, briefFile, thread] = args
       const channel = thread && !channelSessionAllowed(thread.replace(/^discord:/, ''), key) && loadChannels().get(thread.replace(/^discord:/, ''))
-      if (channel) { console.error(`refused: ${thread} is the channel ${channel}, not a thread. Make a thread first (bun ~/.omocat/mkthread.ts <channel> <message-id> "<name>").`); process.exit(4) }
+      if (channel) { console.error(`refused: ${thread} is the channel ${channel}, not a thread. Make a thread first (bun ${homeRef()}/mkthread.ts <channel> <message-id> "<name>").`); process.exit(4) }
       report(await openLane(liveLifecycleDeps(), { key: key!, label: label!, cwd: cwd!, thread: thread ?? null, briefText: readFileSync(briefFile!, 'utf8'), noClaim }))
       break
     }
@@ -297,7 +298,7 @@ if (import.meta.main) {
       break
     }
     case 'reopen':
-      report(await reopenLane(liveLifecycleDeps(), { key: args[0]!, text: args.slice(1).join(' '), fresh: process.env.OMOMEOW_FRESH === '1', noClaim }))
+      report(await reopenLane(liveLifecycleDeps(), { key: args[0]!, text: args.slice(1).join(' '), fresh: process.env.OMODORI_FRESH === '1', noClaim }))
       break
     case 'list':
       console.log(JSON.stringify(map, null, 2))

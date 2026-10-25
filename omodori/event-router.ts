@@ -1,16 +1,17 @@
-// Dandori event router (redesign S6): the single entry from machine events to the lead.
+// Dori event router (redesign S6): the single entry from machine events to the lead.
 //   stdin = the dori sweeps' legacy lines (LANE_QUOTA ..., NUDGED ..., KAKAO_STALL ...) mixed with supervisor events
 //           (JSON lines from `tail -n +1 -F events/supervisor.ndjson`, see dori-monitors.sh)
 //   stdout = only `DORI_ASK <json>` (now) and `DORI_DIGEST <json>` (every 15 min, 60 min at night KST; omitted when empty)
 // Classification is data: event-rules.json (kind -> ask/act/info/fail/drop). The router classifies and aggregates;
 // it never executes anything.
-//   bun event-router.ts [--events <supervisor.ndjson>]   follow mode: checkpoint in $OMOCAT_HOME/state/router-cursor.json
+//   bun event-router.ts [--events <supervisor.ndjson>]   follow mode: checkpoint in $OMODORI_HOME/state/router-cursor.json
 //   bun event-router.ts --now                            read stdin to EOF, print asks + one digest, keep no state
 // Checkpoint {fileIno, offset, lastEventId, seen[], pending}: an event id is routed at most once across restarts.
 // With --events the router locates each JSON line in the file (same inode -> skip up to the saved offset; a new inode
 // or a truncated file -> read from offset 0 but skip through lastEventId and every id already seen).
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { doriHome } from './config'
 
 export type Route = 'ask' | 'act' | 'info' | 'fail' | 'drop'
 type EventRule = { kind: string; when?: { path: string; eq?: unknown; gt?: number }; route: Route }
@@ -25,8 +26,8 @@ export type Pending = { act: Item[]; info: Item[]; fail: Item[]; dueAt: number |
 export type Cursor = { v: 1; fileIno: number | null; offset: number; lastEventId: string | null; seen: string[]; pending: Pending }
 
 const SEEN_MAX = 5000
-export const OMOCAT = process.env.OMOCAT_HOME ?? `${process.env.HOME}/.omocat`
-export const CURSOR_PATH = `${OMOCAT}/state/router-cursor.json`
+export const DORI_HOME = doriHome()
+export const CURSOR_PATH = `${DORI_HOME}/state/router-cursor.json`
 export const RULES_PATH = process.env.EVENT_RULES ?? `${import.meta.dir}/event-rules.json`
 
 export const loadRules = (path = RULES_PATH): Rules => JSON.parse(readFileSync(path, 'utf8'))
@@ -61,7 +62,7 @@ export function classifyLegacy(line: string, rules: Rules): { route: Route; kind
   return { route: 'drop', kind: 'legacy.noise' }
 }
 
-/** The OMOCAT_HERDR payload herdr-watch used to print for this event (kept inside DORI_ lines for the lead's relays). */
+/** The OMODORI_HERDR payload herdr-watch used to print for this event (kept inside DORI_ lines for the lead's relays). */
 export function herdrCompat(ev: any): unknown {
   switch (ev.kind) {
     case 'lane.turn_done': return { event: 'turn_done', pane: ev.pane, session: ev.lane, thread: ev.thread ?? null, source: 'rpc', id: ev.id, turn_epoch: ev.data?.turn_epoch ?? null }

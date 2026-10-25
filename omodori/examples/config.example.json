@@ -1,6 +1,51 @@
 {
-  "//": "Copy to $OMOCAT_HOME/config.json (install.sh does this) and replace every example value. Fields left out use the defaults in config.ts. The ids below are fake; the test suite runs against this file.",
+  "//": "Copy to $OMODORI_HOME/config.json (install.sh does this) and replace every example value. Fields left out use the defaults in config.ts. The ids below are fake; the test suite runs against this file.",
+  "owner": {
+    "title": "주인"
+  },
+  "lead": {
+    "name": "리드",
+    "keyPrefix": "dori-lead"
+  },
+  "bots": [
+    {
+      "//": "Fictional example bot 1: the chat bot of the group, friend and 1:1 rooms.",
+      "name": "모모",
+      "calls": [
+        "모모"
+      ],
+      "about": "모모는 주인이 만든 카톡 봇이다. 이름을 부르거나, 모모에게 묻거나, 모모와 하던 대화를 이어갈 때 답한다. 사람들끼리 잡담에는 끼지 않는 게 기본이다.",
+      "lanes": [
+        "kakao-chat",
+        "kakao-work",
+        "kakao-group",
+        "kakao-owner",
+        "kakao-lead-docs"
+      ],
+      "commands": [
+        "전적(검색)?\\s+\\S",
+        "순위표",
+        "명령어"
+      ]
+    },
+    {
+      "//": "Fictional example bot 2: the document bot of the work room (that room has \"gate\": true in kakao-rooms.json).",
+      "name": "루루",
+      "calls": [
+        "루루",
+        "문서봇"
+      ],
+      "about": "루루는 문서 작업 봇이다. 루루·문서봇으로 부르거나 멘션·답장하거나, 맡긴 문서 일에 자료·답변·추가 지시를 줄 때만 답한다. 사람끼리 잡담에는 침묵한다.",
+      "lanes": [
+        "kakao-docs"
+      ]
+    }
+  ],
+  "voice": {
+    "initialPrompt": ""
+  },
   "discord": {
+    "botName": "assistant",
     "guildId": "1000000000000000000",
     "ownerId": "100000000000000099",
     "generalChannel": "1000000000000000001",
@@ -13,25 +58,53 @@
   "kakao": {
     "locoPort": 8397,
     "healthChatId": "18000000000000003",
-    "ragChatIds": ["18000000000000001", "18000000000000005"],
+    "ragChatIds": [
+      "18000000000000001",
+      "18000000000000005"
+    ],
     "archiveRoot": "~/KakaoArchive",
     "requestsLedger": "",
     "ownerRoom": "주인 1:1",
     "botUserId": "400000001",
     "generatedImagesDir": "~/generated-images/",
-    "docOutDir": "~/.omocat/doc-out/",
+    "docOutDir": "",
     "issueRefRooms": []
   },
   "launchd": {
     "prefix": "com.example.dori",
     "kakaoArchiveSync": "com.example.kakao-archive.sync",
-    "services": ["supervisor", "heartbeat", "decisions", "ceo-weekly", "repo-patrol", "kakao-live", "kakao-push", "kakao-health", "wake-filter-stats"]
+    "services": [
+      "supervisor",
+      "heartbeat",
+      "decisions",
+      "ceo-weekly",
+      "repo-patrol",
+      "kakao-live",
+      "kakao-push",
+      "kakao-health",
+      "wake-filter-stats"
+    ]
   },
-  "claudeAccounts": ["default", "alt", "work"],
+  "claudeAccounts": [
+    "default",
+    "alt",
+    "work"
+  ],
   "paths": {
+    "dataDir": "",
+    "logDir": "~/Library/Logs/omodori",
     "memoryRepo": "",
-    "disks": ["/"],
-    "genericCwds": ["/", "/Users", "~", "/Volumes", "/Volumes/Data", "/tmp", "/private/tmp"]
+    "disks": [
+      "/"
+    ],
+    "genericCwds": [
+      "/",
+      "/Users",
+      "~",
+      "/Volumes",
+      "/tmp",
+      "/private/tmp"
+    ]
   },
   "git": {
     "name": "",

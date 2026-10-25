@@ -4,7 +4,7 @@ import { accountStates, classify, GPT_FALLBACK, normStatus } from './lane-classi
 const NOW = Date.parse('2026-10-23T09:00:00.000Z')
 const at = (minAgo: number) => new Date(NOW - minAgo * 60_000).toISOString()
 const delivery = (minAgo: number, id = `d${minAgo}`) =>
-  JSON.stringify({ type: 'custom_message', customType: 'session_control_delivery', content: `hi\n\n[dandori-msg:${id}]`, details: { delivery_id: id }, id: `e${id}`, timestamp: at(minAgo) })
+  JSON.stringify({ type: 'custom_message', customType: 'session_control_delivery', content: `hi\n\n[dori-msg:${id}]`, details: { delivery_id: id }, id: `e${id}`, timestamp: at(minAgo) })
 const ok = (minAgo: number, provider = 'anthropic-subscription') =>
   JSON.stringify({ type: 'message', timestamp: at(minAgo), message: { role: 'assistant', stopReason: 'stop', provider, content: [{ type: 'text', text: 'done' }] } })
 const err = (minAgo: number, text: string, provider = 'anthropic-subscription') =>

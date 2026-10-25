@@ -3,15 +3,12 @@
 // questions in one request, jev-1.13.0, threshold 0.38). Any Jev failure wakes (fail-open), so a dead filter
 // behaves like no filter. The decision log keeps ids, scores and latency only, never message text.
 import { appendFileSync, readFileSync } from 'node:fs'
-// acme-rag #2 (주인 10-22, Dandori 승인): personal/financial lines are masked before the external Jev call, only in
-// these two rooms (replay 809: 12 states changed, must-wake misses +0). pii-guard.ts is a copy of rag/integration/pii-guard.ts.
+// Per-room switches from kakao-rooms.json: maskPii masks personal/financial lines before the external Jev call
+// (replay 809: 12 states changed, must-wake misses +0; pii-guard.ts is a copy of rag/integration/pii-guard.ts).
+// noJev never calls Jev (the owner's non-reaction lines always wake). stripSelf removes the bot's own lines and ledger
+// titles before the Jev call; text a user writes stays (it is the message).
 import { sanitizeJevState } from './pii-guard'
-import { cfg } from './config'
-const MASK_ROOMS = new Set(['[ACME] 테스트', '리드방'])
-// acme-rag #2 (Dandori 10-23): 리드방 never calls Jev (the owner's non-reaction lines always wake). In [ACME] 테스트
-// the bot's own lines and ledger titles are removed before the Jev call; text a user writes stays (it is the message).
-const NO_JEV_ROOMS = new Set(['리드방'])
-const STRIP_SELF_ROOMS = new Set(['[ACME] 테스트'])
+import { botForLane, callSource, cfg, kakaoLogs, type Bot } from './config'
 export function withoutSelf(state: Record<string, unknown>): Record<string, unknown> {
   const lines = Array.isArray(state.previous_lines) ? (state.previous_lines as { is_bot?: boolean }[]).filter((l) => !l.is_bot) : state.previous_lines
   const out: Record<string, unknown> = { ...state, previous_lines: lines, bot_recent_replies: [] }
@@ -25,18 +22,16 @@ export const THRESHOLD = 0.38
 export const TIMEOUT_MS = 1000
 export const BOT_ID = cfg.kakao.botUserId
 const JEV_URL = 'https://api.typesafe.ai/v1/systemone'
-const KEY_FILE = `${process.env.HOME}/.config/omomeow/typesafe.env`
-export const DECISION_LOG = process.env.WAKE_FILTER_LOG ?? `${process.env.HOME}/Library/Logs/dandori-kakao/wake-filter.ndjson`
+const KEY_FILE = `${process.env.HOME}/.config/omodori/typesafe.env`
+export const DECISION_LOG = process.env.WAKE_FILTER_LOG ?? `${kakaoLogs()}/wake-filter.ndjson`
 
-// Same per-lane bot names and descriptions the experiment's state used (scripts/build_dataset.py).
-const BOT: Record<string, { name: string; call: RegExp; about: string }> = {
-  'kakao-family': { name: '도리', call: /도리|단도리/, about: '도리(장도리/단도리)는 주인이 만든 카톡 봇이다. 이름을 부르거나, 도리에게 묻거나, 도리와 하던 대화를 이어갈 때 답한다. 사람들끼리 잡담에는 끼지 않는 게 기본이다.' },
-  'kakao-acme-chat': { name: '장도리', call: /도리/, about: '장도리는 주인이 만든 업무 봇이다. 장도리를 부르거나 장도리에게 묻거나 맡긴 일을 이어갈 때 답한다. 사람끼리 대화에는 끼지 않는다.' },
-  'kakao-friend': { name: '장도리', call: /도리/, about: '장도리는 주인가 만든 봇이고 친구B와 친절하게 대화한다. 부르거나 묻거나 하던 대화를 이어갈 때 답한다.' },
-  'kakao-owner': { name: '장도리', call: /도리/, about: '장도리는 주인의 개인 비서 봇이다. 1:1 방이라 모든 말이 장도리에게 하는 말이다.' },
-  'kakao-acme-docs': { name: '강비서', call: /강비서|비서/, about: '강비서(비서)는 문서 작업 봇이다. 강비서·비서로 부르거나 멘션·답장하거나, 맡긴 문서 일에 자료·답변·추가 지시를 줄 때만 답한다. 사람끼리 잡담에는 침묵한다.' },
+// Bot names, call words and descriptions come from config.json bots[] (the Jev state carries name and about).
+type BotRules = { name: string; about: string; call: RegExp | null; command: RegExp | null }
+export function botRules(bot: Bot): BotRules {
+  const calls = callSource(bot)
+  const command = bot.commands?.length ? new RegExp(`^\\s*(?:(?:${calls ?? '(?!)'})\\s*)?(?:${bot.commands.join('|')})`) : null
+  return { name: bot.name, about: bot.about, call: calls ? new RegExp(calls) : null, command }
 }
-const COMMAND = /^\s*(장도리\s*)?(전적(검색)?\s+\S|클랜리포트|순위표|칭호|케미|골든타임|가입탈퇴|명령어|오늘 클랜전)/
 export const REACTION = /^[\sㅋㅎㅠㅜ.!?~^]*$/
 const POSITIVE = ['seeks_bot', 'addressed_to_bot', 'continues_bot_thread', 'adds_to_bot_task', 'work_request'] as const
 
@@ -58,10 +53,10 @@ export const QUESTIONS = {
   to_other_person: { type: 'noul', instructions: 'Is `message` meant for a person in the room other than the bot?' },
 }
 
-// [ACME] 테스트 room (주인 10-21): the secretary answers work it was not called for, so each line is triaged into
+// [작업] 문서방 room (주인 10-21): the secretary answers work it was not called for, so each line is triaged into
 // respond / collect (context for the next wake only) / discard. Same Noul style as v3, plus the secretary's open
 // request titles from its ledger so "is this a follow-up to work it holds" can be judged.
-export const LEDGER = process.env.ACME_LEDGER ?? cfg.kakao.requestsLedger
+export const LEDGER = process.env.OMODORI_REQUESTS_LEDGER ?? cfg.kakao.requestsLedger
 const CLOSED = new Set(['완료', '취소'])
 export type OpenRequest = { title: string; requester: string; status: string }
 export type LedgerReq = { user_id?: string; title?: string; nick?: string; status?: string; created?: string; updated?: string; log?: { at?: string }[] }
@@ -164,7 +159,10 @@ export function triageOf(scores: Record<string, number>, hasMaterial: boolean, r
   return hasMaterial || (scores.useful_context ?? 0) >= collectAt ? 'collect' : 'discard'
 }
 
-export type FilterRoom = { name: string; lane: string; owner: string[]; ownerOnly?: boolean; names?: Record<string, string> }
+export type FilterRoom = {
+  name: string; lane: string; owner: string[]; ownerOnly?: boolean; names?: Record<string, string>
+  noJev?: boolean; maskPii?: boolean; stripSelf?: boolean
+}
 type Line = { author: string; is_bot: boolean; is_creator: boolean; text: string; has_photo: boolean; reply_to?: string; mentions?: string[] }
 type Entry = { t: number; sid: string; logId: string; isBot: boolean; feed: boolean; line: Line; mentions: string[]; replyTo: string }
 export type State = {
@@ -198,7 +196,8 @@ export function createWakeFilter(opts: {
   const history = new Map<string, Entry[]>()
   const lastWake = new Map<string, number>()
 
-  const botOf = (room: FilterRoom) => BOT[room.lane] ?? BOT['kakao-family']!
+  const rules = new Map<string, BotRules>()
+  const botOf = (room: FilterRoom) => { let r = rules.get(room.lane); if (!r) rules.set(room.lane, (r = botRules(botForLane(room.lane)))); return r }
   const nameOf = (room: FilterRoom, sid: string, isBot: boolean, sender?: string) =>
     isBot ? botOf(room).name : room.owner.includes(sid) ? '주인' : room.names?.[sid] ?? sender ?? nicks[sid] ?? `user${sid.slice(-4)}`
 
@@ -247,8 +246,8 @@ export function createWakeFilter(opts: {
     if (room.ownerOnly) return 'direct_room'
     if (e.mentions.includes(BOT_ID)) return 'mention'
     if (e.replyTo === BOT_ID) return 'reply_to_bot'
-    if (botOf(room).call.test(e.line.text)) return 'name_call'
-    if (room.lane === 'kakao-family' && COMMAND.test(e.line.text)) return 'command'
+    if (botOf(room).call?.test(e.line.text)) return 'name_call'
+    if (botOf(room).command?.test(e.line.text)) return 'command'
     if (e.line.has_photo) {
       const woke = lastWake.get(`${o.chat}:${e.sid}`)
       if (woke !== undefined && e.t - woke <= 45 * 60_000) return 'photo_by_engaged'
@@ -259,18 +258,17 @@ export function createWakeFilter(opts: {
     return null
   }
 
-  async function callJev(state: unknown, questions: unknown): Promise<{ scores: Record<string, number>; tokens?: number } | { error: string }> {
-    const roomName = String((state as { room?: { name?: string } } | null)?.room?.name)
-    if (NO_JEV_ROOMS.has(roomName)) return { error: 'no-jev-room' }
+  async function callJev(room: FilterRoom, state: unknown, questions: unknown): Promise<{ scores: Record<string, number>; tokens?: number } | { error: string }> {
+    if (room.noJev) return { error: 'no-jev-room' }
     const key = apiKey()
     if (!key) return { error: 'no-key' }
-    const own = STRIP_SELF_ROOMS.has(roomName) ? withoutSelf(state as Record<string, unknown>) : state
+    const own = room.stripSelf ? withoutSelf(state as Record<string, unknown>) : state
     let res: Response
     try {
       res = await doFetch(JEV_URL, {
         method: 'POST', signal: AbortSignal.timeout(timeoutMs),
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: MODEL, state: MASK_ROOMS.has(roomName) ? sanitizeJevState(own) : own, questions }),
+        body: JSON.stringify({ model: MODEL, state: room.maskPii ? sanitizeJevState(own) : own, questions }),
       })
     } catch (e) {
       const name = (e as Error)?.name
@@ -288,8 +286,8 @@ export function createWakeFilter(opts: {
     return { scores, tokens }
   }
 
-  async function ask(state: State): Promise<{ score: number; scores: Record<string, number>; tokens?: number } | { error: string }> {
-    const r = await callJev(state, QUESTIONS)
+  async function ask(room: FilterRoom, state: State): Promise<{ score: number; scores: Record<string, number>; tokens?: number } | { error: string }> {
+    const r = await callJev(room, state, QUESTIONS)
     if ('error' in r) return r
     const { scores, tokens } = r
     const pos = POSITIVE.map((k) => scores[k]).filter((x): x is number => Number.isFinite(x))
@@ -305,9 +303,9 @@ export function createWakeFilter(opts: {
     const hard = hardReason(o)
     if (hard) d = { decision: 'hard-wake', reason: hard }
     else if (!o.entry.line.has_photo && REACTION.test(o.entry.line.text)) d = { decision: 'skip', reason: 'reaction' }
-    else if (NO_JEV_ROOMS.has(o.room.name)) d = o.entry.line.is_creator ? { decision: 'wake', reason: 'owner_room' } : { decision: 'skip', reason: 'not_owner' }
+    else if (o.room.noJev) d = o.entry.line.is_creator ? { decision: 'wake', reason: 'owner_room' } : { decision: 'skip', reason: 'not_owner' }
     else {
-      const r = await ask(o.state)
+      const r = await ask(o.room, o.state)
       if ('error' in r) d = { decision: 'fail-open', reason: r.error }
       else d = { decision: r.score >= THRESHOLD ? 'wake' : 'skip', reason: 'jev', score: Math.round(r.score * 1000) / 1000, scores: round(r.scores), tokens: r.tokens }
     }
@@ -324,7 +322,7 @@ export function createWakeFilter(opts: {
     } catch (e) { console.error(new Date().toISOString(), 'wake-filter log failed', (e as Error)?.message) }
   }
 
-  // [ACME] 테스트 room: one judgment per burst (one person's lines held by createBurstBuffer). The secretary gate's
+  // [작업] 문서방 room: one judgment per burst (one person's lines held by createBurstBuffer). The secretary gate's
   // direct call / mention / reply makes the whole burst respond. A person the secretary is working for (open request,
   // ledger work in the last 30 min, or a respond in this room in the last 15 min) is treated as following up: their
   // lines respond unless Jev sees a bare reaction or talk to someone else. On a Jev failure each line falls back to
@@ -345,7 +343,7 @@ export function createWakeFilter(opts: {
     if (gates.includes('called')) return finish(gates.map((g) => ({ kind: 'respond', via: g === 'called' ? 'gate' : 'group' })), { decision: 'hard-wake', reason: 'gate_called' })
     const material = lines.some((l) => l.has_photo || l.text.startsWith('[파일]'))
     if (!material && lines.every((l) => REACTION.test(l.text))) return finish(all('discard', 'reaction'), { decision: 'skip', reason: 'reaction' })
-    if (NO_JEV_ROOMS.has(first.room.name)) {
+    if (first.room.noJev) {
       const owner = first.entry.line.is_creator
       return finish(all(owner ? 'respond' : 'discard', 'gate'), owner ? { decision: 'wake', reason: 'owner_room' } : { decision: 'skip', reason: 'not_owner' })
     }
@@ -355,7 +353,7 @@ export function createWakeFilter(opts: {
       || (responded !== undefined && last.entry.t - responded <= 15 * 60_000)
     const message = { ...last.entry.line, text: lines.map((l) => l.text).filter(Boolean).join('\n').slice(0, 600), has_photo: lines.some((l) => l.has_photo) }
     const state = { ...first.state, bot_recent_replies: last.state.bot_recent_replies, message, lines_in_message: lines.length, ...ledger }
-    const r = await callJev(state, DOCS_QUESTIONS)
+    const r = await callJev(first.room, state, DOCS_QUESTIONS)
     if ('error' in r) return finish(gates.map((g) => ({ kind: g === 'continued' ? 'respond' : 'discard', via: 'fail-open' })), { decision: 'fail-open', reason: r.error }, { engaged })
     let kind = triageOf(r.scores, material, DOCS_RESPOND_AT, DOCS_COLLECT_AT)
     let reason = 'jev'

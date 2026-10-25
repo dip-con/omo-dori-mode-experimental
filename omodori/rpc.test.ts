@@ -31,7 +31,7 @@ afterEach(() => {
 })
 
 function workspace() {
-  const root = `/tmp/omocat/rt-${randomBytes(4).toString('hex')}`
+  const root = `/tmp/omodori/rt-${randomBytes(4).toString('hex')}`
   mkdirSync(`${root}/endpoints`, { recursive: true }); mkdirSync(`${root}/sessions/s`, { recursive: true })
   roots.push(root)
   return root
@@ -97,7 +97,7 @@ function deps(root: string, map: Record<string, MapEntry>, procs: Proc[] = OMO_P
     laneStatus: () => null, agentStatus: async () => null,
   }
 }
-const lane = (key: string, status = 'open'): Record<string, MapEntry> => ({ [key]: { key, sessionId: HOST_DURABLE, status, pane: 'w:p1', cwd: '/tmp/omocat/rpc-fixture' } })
+const lane = (key: string, status = 'open'): Record<string, MapEntry> => ({ [key]: { key, sessionId: HOST_DURABLE, status, pane: 'w:p1', cwd: '/tmp/omodori/rpc-fixture' } })
 const steerFrames = (f: Fake) => f.frames.filter((x) => ['steer', 'follow_up', 'prompt'].includes(x.type))
 
 function herdrMock() {
@@ -209,7 +209,7 @@ describe('receipt parser', () => {
     const line = fixture('delivery-custom-message.jsonl').trim()
     expect(lineProvesDelivery(line, JSON.parse(line).details.delivery_id)).toBe(true)
   })
-  test('user message carrying [dandori-msg:<id>]', () => {
+  test('user message carrying [dori-msg:<id>]', () => {
     expect(receiptIn(fixture('herdr-user-tag.jsonl'), 'fixture-id-2')).toBe('persisted')
   })
   test('absent otherwise', () => {
@@ -217,7 +217,7 @@ describe('receipt parser', () => {
     const id = JSON.parse(line).details.delivery_id
     expect(receiptIn(line, `${id}-other`)).toBe('absent')
     expect(receiptIn(JSON.stringify({ type: 'custom_message', customType: 'other', details: { delivery_id: 'abc-1' } }), 'abc-1')).toBe('absent')
-    expect(receiptIn(JSON.stringify({ type: 'message', message: { role: 'assistant', content: '[dandori-msg:abc-1]' } }), 'abc-1')).toBe('absent')
+    expect(receiptIn(JSON.stringify({ type: 'message', message: { role: 'assistant', content: '[dori-msg:abc-1]' } }), 'abc-1')).toBe('absent')
     expect(receiptIn('', 'abc-1')).toBe('absent')
   })
 })
@@ -283,7 +283,7 @@ describe('managed targets', () => {
     const root = workspace()
     const f = await fakeEndpoint(root, { kind: 'tui' })
     expect(await createRpc(deps(root, lane('k', 'closed'))).send('k', 'ping', { id: 'm1' })).toMatchObject({ status: 'refused', reason: 'unmanaged_target' })
-    expect(await createRpc(deps(root, lane('dandori-lead-20261018'))).send('dandori-lead-20261018', 'ping', { id: 'm2' })).toMatchObject({ status: 'refused', reason: 'unmanaged_target' })
+    expect(await createRpc(deps(root, lane('dori-lead-20261018'))).send('dori-lead-20261018', 'ping', { id: 'm2' })).toMatchObject({ status: 'refused', reason: 'unmanaged_target' })
     expect(steerFrames(f)).toHaveLength(0)
   })
   test('child target needs childOk', async () => {

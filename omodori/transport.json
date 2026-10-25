@@ -1,8 +1,7 @@
 {
   "default": "rpc",
   "rpc": [
-    "kakao-dandori-docs",
-    "kakao-acme-docs",
+    "kakao-docs",
     "rpc-smoke"
   ]
 }

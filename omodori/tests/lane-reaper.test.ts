@@ -60,20 +60,20 @@ describe('plan', () => {
   })
 
   test('leftover dev server under a closed lane cwd is reported, protected pids and open-lane cwds are not', () => {
-    const lanes = [{ key: 'c', status: 'closed', cwd: '/Volumes/Data/Outsourcing/app', closedAt: iso(H) }]
+    const lanes = [{ key: 'c', status: 'closed', cwd: '/Volumes/Work/app', closedAt: iso(H) }]
     const procs = [
-      { pid: 500, ppid: 1, etimeMs: 7 * H, cmd: '/usr/bin/node /x/node_modules/.bin/vite --port 5173', cwd: '/Volumes/Data/Outsourcing/app/web' },
+      { pid: 500, ppid: 1, etimeMs: 7 * H, cmd: '/usr/bin/node /x/node_modules/.bin/vite --port 5173', cwd: '/Volumes/Work/app/web' },
       { pid: 501, ppid: 1, etimeMs: H, cmd: 'node vite', cwd: '/elsewhere' },
-      { pid: 111, ppid: 1, etimeMs: H, cmd: 'node vite', cwd: '/Volumes/Data/Outsourcing/app' },
+      { pid: 111, ppid: 1, etimeMs: H, cmd: 'node vite', cwd: '/Volumes/Work/app' },
     ]
     expect(plan(base({ lanes, procs }))).toEqual(['LANE_LEFTOVER c pids=500 cmd=node vite --port 5173 age=7h'])
-    const withOpen = [...lanes, { key: 'o', status: 'working', cwd: '/Volumes/Data/Outsourcing/app/web' }]
+    const withOpen = [...lanes, { key: 'o', status: 'working', cwd: '/Volumes/Work/app/web' }]
     expect(plan(base({ lanes: withOpen, procs }))).toEqual([])
   })
 
   test('generic cwd never matches leftovers by cwd', () => {
-    const lanes = [{ key: 'c', status: 'closed', cwd: '/Volumes/Data', closedAt: iso(H) }]
-    const procs = [{ pid: 500, ppid: 1, etimeMs: H, cmd: 'node vite', cwd: '/Volumes/Data/other' }]
+    const lanes = [{ key: 'c', status: 'closed', cwd: '/Volumes/Work', closedAt: iso(H) }]
+    const procs = [{ pid: 500, ppid: 1, etimeMs: H, cmd: 'node vite', cwd: '/Volumes/Work/other' }]
     expect(plan(base({ lanes, procs }))).toEqual([])
   })
 

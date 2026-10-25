@@ -1,16 +1,16 @@
-// Lane transition (redesign S8, docs/dori-redesign/final.md §2.8): the one path for reset, quota moves, GPT fallback,
+// Lane transition (redesign S8): the one path for reset, quota moves, GPT fallback,
 // Claude return and migrate. The lane keeps its key; it gets a FRESH session (new durable id) seeded with a handoff artifact.
 //   bun lane-transition.ts <key> --fresh [--account A | --model M [--thinking T]] [--reason quota|reset|manual]
 //                          [--profile P] [--dry] [--force] [--settle-timeout SECONDS]
 //   bun lane-transition.ts --resume <opId>          continue a crashed/failed op after its last done step
-// Steps (each recorded in OMOCAT/ops/<opId>.json as `step` = last done step, plus history):
+// Steps (each recorded in DORI_HOME/ops/<opId>.json as `step` = last done step, plus history):
 //    1 lease        lane lifecycle lease (registry.ts format, op 'transition'); a live holder -> exit 4 lease_held
 //    2 preconds     children known and none running (else exit 4 children_unknown / children_running, --force skips);
 //                   reason != quota: settled wait (rpc wait + recheck, max --settle-timeout, default 2 h) -> exit 4 not_settled
 //    3 admission    the lease pauses Kakao admission (kakao-push checks it); wait <= 120 s for this lane's in-flight batch
 //    4 inventory    old transcript: delivery with a successful assistant entry after it = processed, else carried;
 //                   kakao batches: accepted/uncertain with a receipt -> persisted, without -> carried, queued -> kept queued.
-//                   One line per op in OMOCAT/lane-transitions.jsonl
+//                   One line per op in DORI_HOME/lane-transitions.jsonl
 //    5 artifact     ~/.dori/state/handoffs/<key>/g<N>.md (brief + checkpoint + carried list + claim rule unless noClaim);
 //                   then the profile's beforeClose hooks
 //    6 close        herdr tab close of the recorded old tab (CAS on the registry tab); processes still carrying the old
@@ -19,7 +19,7 @@
 //                   the brief goes in as an attached file, never as typed text
 //    8 verify       the pane process argv has the requested --claude-account (or none for GPT) and the new session id
 //    9 rebind       patchLane(key, g -> g+1): session, tab, pane, profile, model, accountRequested, seed {state: pending}
-//   10 seed         seed id receipt (user message carrying [dandori-msg:seed:<key>:<N>]) -> seed.state applied; one fallback
+//   10 seed         seed id receipt (user message carrying [dori-msg:seed:<key>:<N>]) -> seed.state applied; one fallback
 //                   send with the same id; still unconfirmed -> last 80 screen lines kept, new tab closed, lane closed,
 //                   lease released, ask lane.empty_after_handoff (exit 1)
 //   11 carry        carried transcript deliveries re-sent in order as <id>:g<N>; lane-migrations.jsonl; lease released
@@ -27,7 +27,7 @@
 // Kakao batches are never re-sent here: carried batches stay in the queue and kakao-push sends them (same batch id) once
 // seed.state is applied and the lease is gone.
 // Exit codes: 0 done, 1 failed (op kept; --resume continues it), 2 usage, 4 refused (nothing changed or op ended cleanly).
-// OMOCAT_HOME (default ~/.omocat) roots map, leases, ops, queue, ledgers, and (when set) handoffs; tests use a temp tree.
+// OMODORI_HOME (default ~/.omodori) roots map, leases, ops, queue, ledgers, and (when set) handoffs; tests use a temp tree.
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { checkPane, isOmoProcess, tagFor, type Proc } from './deliver'
@@ -35,7 +35,7 @@ import { GPT_FALLBACK } from './lane-classify'
 import { Queue, queuePath, type Batch, type SentTo } from './kakao-queue'
 import { acquireDirLock, addLineage, appendEvent, type Entry, type Held, LANE_KEY_RE, paths, patchLane, readMap, RegistryError, updateDoriLane } from './registry'
 import { receipt } from './rpc'
-import { cfg } from './config'
+import { cfg, homeRef, doriHome, installHome } from './config'
 
 const HOME = process.env.HOME!
 export const DEFAULT_MODEL = 'anthropic-subscription/claude-opus-5-5'
@@ -103,7 +103,9 @@ export type TransitionDeps = {
   accountWaitMs?: number
 }
 
-const expand = (p: string) => p.replace(/^~(?=\/)/, HOME)
+// Profile paths may start with ~, {home} (the data folder: config.json paths.dataDir / OMODORI_HOME) or {install}
+// (the folder with the code: OMODORI_HOME / ~/.omodori).
+const expand = (p: string) => p.replace(/^\{home\}(?=\/|$)/, doriHome()).replace(/^\{install\}(?=\/|$)/, installHome()).replace(/^~(?=\/|$)/, HOME)
 const readTrim = (p: string) => { try { return readFileSync(expand(p), 'utf8').trim() || null } catch { return null } }
 const iso = (ms: number) => new Date(ms).toISOString()
 
@@ -135,7 +137,7 @@ export function sessionSpec(profile: Profile, entry: Entry | undefined, a: Pick<
 
 export function buildArgv(o: { key: string; sessionId: string; model: string; thinking: string; account: string | null; profile: Profile; attach?: { file: string; message: string } }): string[] {
   return [
-    `OMOMEOW_LANE_KEY=${o.key}`, `OMOMEOW_MODEL=${o.model}`, `OMOMEOW_THINKING=${o.thinking}`,
+    `OMODORI_LANE_KEY=${o.key}`, `OMODORI_MODEL=${o.model}`, `OMODORI_THINKING=${o.thinking}`,
     'omo', '--model', o.model, '--thinking', o.thinking, '--session-id', o.sessionId,
     ...o.profile.ext.flatMap((e) => ['-e', expand(e)]),
     ...(o.profile.tools ? ['--tools', o.profile.tools] : []),
@@ -167,7 +169,7 @@ export function verifyArgv(argv: string[], want: { sessionId: string; model: str
 
 const deliveryText = (content: unknown): string => {
   const t = typeof content === 'string' ? content : Array.isArray(content) ? content.map((c: any) => (typeof c?.text === 'string' ? c.text : '')).join('') : ''
-  return t.replace(/\s*\[dandori-msg:[^\]]+\]\s*$/, '').trim()
+  return t.replace(/\s*\[dori-msg:[^\]]+\]\s*$/, '').trim()
 }
 /** Deliveries of a transcript, each processed when a successful (not error/aborted) assistant entry follows it. */
 export function transcriptInventory(text: string): { processed: Delivered[]; unprocessed: Delivered[] } {
@@ -180,7 +182,7 @@ export function transcriptInventory(text: string): { processed: Delivered[]; unp
     if (j.type === 'custom_message' && j.customType === 'session_control_delivery' && typeof j.details?.delivery_id === 'string') {
       rows.push({ kind: 'delivery', d: { id: j.details.delivery_id, text: deliveryText(j.content), ts: j.timestamp } })
     } else if (j.type === 'message' && j.message?.role === 'user') {
-      const m = /\[dandori-msg:([^\]]+)\]/.exec(JSON.stringify(j.message.content ?? ''))
+      const m = /\[dori-msg:([^\]]+)\]/.exec(JSON.stringify(j.message.content ?? ''))
       if (m) rows.push({ kind: 'delivery', d: { id: m[1]!, text: deliveryText(j.message.content), ts: j.timestamp } })
     } else if (j.type === 'message' && j.message?.role === 'assistant') {
       rows.push({ kind: 'assistant', ok: j.message.stopReason !== 'error' && j.message.stopReason !== 'aborted' })
@@ -196,7 +198,7 @@ export function transcriptInventory(text: string): { processed: Delivered[]; unp
 }
 
 const claimRule = (key: string) =>
-  `[Dandori 규칙] 끝났다고 판단되면 근거와 함께 \`dori claim-done ${key} --evidence "<머지 SHA, 닫힌 이슈, 배포 SHA, 결과 파일>"\`로 완료를 주장해. Dandori가 5분 안에 근거를 직접 확인해서 닫거나(dori close), 이유와 함께 not-done으로 돌려보내. 커밋·푸시 안 된 작업이 있으면 닫히지 않아. 중간 보고는 \`[REPORT] ${key} | <milestone|blocker|question|done> | <내용>\` 형식으로 Dandori 창에 보내.`
+  `[${cfg.lead.name} 규칙] 끝났다고 판단되면 근거와 함께 \`dori claim-done ${key} --evidence "<머지 SHA, 닫힌 이슈, 배포 SHA, 결과 파일>"\`로 완료를 주장해. ${cfg.lead.name}가 5분 안에 근거를 직접 확인해서 닫거나(dori close), 이유와 함께 not-done으로 돌려보내. 커밋·푸시 안 된 작업이 있으면 닫히지 않아. 중간 보고는 \`[REPORT] ${key} | <milestone|blocker|question|done> | <내용>\` 형식으로 ${cfg.lead.name} 창에 보내.`
 
 type Msg = { role: string; text: string; ts: string }
 function checkpointOf(text: string, key: string): { reports: string[]; recent: string[] } {
@@ -549,7 +551,7 @@ async function run(deps: TransitionDeps, op: Op, held: Held): Promise<Result> {
     saveOp(deps, op)
     held.release()
     const code = e instanceof Refused && op.status === 'refused' ? 4 : 1
-    return { exit: code, out: { error: e instanceof Refused ? e.code : 'transition_failed', key: op.key, opId: op.opId, step: op.step, detail: e instanceof Refused ? e.detail ?? null : op.error, resume: op.status === 'failed' && op.refusal !== 'seed_unconfirmed' ? `bun ~/.omocat/lane-transition.ts --resume ${op.opId}` : null } }
+    return { exit: code, out: { error: e instanceof Refused ? e.code : 'transition_failed', key: op.key, opId: op.opId, step: op.step, detail: e instanceof Refused ? e.detail ?? null : op.error, resume: op.status === 'failed' && op.refusal !== 'seed_unconfirmed' ? `bun ${homeRef()}/lane-transition.ts --resume ${op.opId}` : null } }
   }
   op.status = 'done'
   saveOp(deps, op)
@@ -569,7 +571,7 @@ export async function startTransition(deps: TransitionDeps, args: Args): Promise
   try {
     if (!LANE_KEY_RE.test(args.key)) throw new Refused('bad_key', args.key)
     const pending = pendingOps(deps.home, args.key)
-    if (pending.length) throw new Refused('op_pending', { opId: pending[0]!.opId, status: pending[0]!.status, resume: `bun ~/.omocat/lane-transition.ts --resume ${pending[0]!.opId}` })
+    if (pending.length) throw new Refused('op_pending', { opId: pending[0]!.opId, status: pending[0]!.status, resume: `bun ${homeRef()}/lane-transition.ts --resume ${pending[0]!.opId}` })
     const opId = `op_${iso(deps.now()).replace(/[-:.]/g, '').slice(0, 15)}_${args.key}_${deps.newId().slice(0, 8)}`
     const entry0 = readMap(deps.home)[args.key]
     const held = await takeLease(deps, args.key, { generation: entry0?.generation ?? 0, opId })
@@ -679,8 +681,8 @@ export async function liveDeps(): Promise<TransitionDeps> {
   }
   return {
     home,
-    handoffsDir: process.env.OMOCAT_HOME ? join(home, 'handoffs') : `${HOME}/.dori/state/handoffs`,
-    briefsDir: process.env.OMOCAT_HOME ? join(home, 'briefs-dori') : `${HOME}/.dori/state/briefs`,
+    handoffsDir: process.env.OMODORI_HOME ? join(home, 'handoffs') : `${HOME}/.dori/state/handoffs`,
+    briefsDir: process.env.OMODORI_HOME ? join(home, 'briefs-dori') : `${HOME}/.dori/state/briefs`,
     profilesDir: join(import.meta.dir, 'lane-profiles'),
     herdr, herdrText,
     workspaceFor: async (cwd) => {

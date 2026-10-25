@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { kakaoLogs } from './config'
 
 const SCRATCH = mkdtempSync(join(tmpdir(), 'kp-env-'))
 process.env.REPLY_REFS_FILE = join(SCRATCH, 'reply-refs.json')
@@ -266,12 +267,12 @@ test('(g)(i) per-lane room files hold the exact chat id; A deliver -> B deliver 
   const dir = join(h.home, 'sa-cache')
   expect(readFileSync(join(dir, `room.${LANE[A]}`), 'utf8')).toBe(A)
   expect(readFileSync(join(dir, `room.${LANE[B]}`), 'utf8')).toBe(B)
-  expect(readFileSync(join(dir, 'jangdori-room'), 'utf8')).toBe(FX_ROOMS[B].name)
-  expect(roomName({ OMOMEOW_LANE_KEY: LANE[A] }, dir, FX_ROOMS)).toBe(FX_ROOMS[A].name)
+  expect(readFileSync(join(dir, 'active-room'), 'utf8')).toBe(FX_ROOMS[B].name)
+  expect(roomName({ OMODORI_LANE_KEY: LANE[A] }, dir, FX_ROOMS)).toBe(FX_ROOMS[A].name)
   expect(roomName({}, dir, FX_ROOMS)).toBe(FX_ROOMS[B].name)
   h.append([msg(PIN, 'pinned').raw])
   await h.drain()
-  expect(readFileSync(join(dir, 'jangdori-room'), 'utf8')).toBe(FX_ROOMS[B].name)
+  expect(readFileSync(join(dir, 'active-room'), 'utf8')).toBe(FX_ROOMS[B].name)
   expect(h.sent.map((s) => s.id)).toEqual([`kakao:${A}:1`, `kakao:${B}:1`, `kakao:${PIN}:1`])
 })
 
@@ -312,7 +313,7 @@ test('(l) a lane whose registry seed.state is pending is not sent to; pause flag
 })
 
 test('replay of the real live.ndjson tail (copy, fake sender, Jev stubbed): crash at every point repeatedly == no-crash run', async () => {
-  const src = `${process.env.HOME}/Library/Logs/dandori-kakao/live.ndjson`
+  const src = `${kakaoLogs()}/live.ndjson`
   if (!existsSync(src)) { console.log('live.ndjson absent: replay skipped'); return }
   const tail = readFileSync(src, 'utf8').split('\n').filter((l) => l.trim()).slice(-400)
   const wf = createWakeFilter({ nicks: {} })
@@ -335,8 +336,8 @@ test('replay of the real live.ndjson tail (copy, fake sender, Jev stubbed): cras
   const crashed = await run(3)
   expect(crashed.crashes).toBeGreaterThan(3)
   expect(crashed.intake).toBe(base.intake)
-  // The acme-docs room groups lines into per-sender bursts whose flush time a restart shifts, so only its set is fixed.
-  const norm = (d: Record<string, string[]>) => Object.fromEntries(Object.entries(d).map(([lane, logs]) => [lane, lane === 'kakao-acme-docs' ? [...logs].sort() : logs]))
+  // The docs room groups lines into per-sender bursts whose flush time a restart shifts, so only its set is fixed.
+  const norm = (d: Record<string, string[]>) => Object.fromEntries(Object.entries(d).map(([lane, logs]) => [lane, lane === 'kakao-docs' ? [...logs].sort() : logs]))
   expect(norm(crashed.delivered)).toEqual(norm(base.delivered))
   expect(Object.values(base.delivered).flat().length).toBeGreaterThan(0)
 }, 60_000)

@@ -1,14 +1,15 @@
 // Watches Herdr for sessions that turn blocked (approval/question UI) and for mapped
-// OmOMeow sessions that finish a turn or disappear. Emits OMOCAT_HERDR lines.
+// Lane sessions that finish a turn or disappear. Emits OMODORI_HERDR lines.
 //   bun herdr-watch.ts                          default source: herdr agent list + screen reads (unchanged)
 //   bun herdr-watch.ts --source rpc [--once] [--since-min N]
-//       reads the supervisor's events/supervisor.ndjson (redesign S4) and prints the same OMOCAT_HERDR shapes for
+//       reads the supervisor's events/supervisor.ndjson (redesign S4) and prints the same OMODORI_HERDR shapes for
 //       turn_done / gone / question; --once prints the last N (default 15) minutes and exits, otherwise follows the file.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { type Deps as ButtonDeps, SELF_PANE, Store, discordRest, herdrCli, syncPaneQuestion } from './buttons'
 import { questionUiAtBottom } from './questions'
+import { doriHome } from './config'
 
-const MAP = `${process.env.HOME}/.omocat/sessions-map.json`
+const MAP = `${doriHome()}/sessions-map.json`
 const SELF = process.env.HERDR_PANE_ID ?? SELF_PANE
 const last = new Map<string, string>()
 let first = true
@@ -43,7 +44,7 @@ type Mapped = { key: string; pane: string; status: string; thread: string | null
 const DORI_LANES = `${process.env.HOME}/.dori/state/lanes`
 const mapped = (): Record<string, Mapped> => {
   const out: Record<string, Mapped> = existsSync(MAP) ? JSON.parse(readFileSync(MAP, 'utf8')) : {}
-  // dori lanes (the registry of record since Dandori moved to dori-mode); thread refs are "discord:<id>"
+  // dori lanes (the registry of record since the lead moved to dori-mode); thread refs are "discord:<id>"
   if (existsSync(DORI_LANES)) for (const f of readdirSync(DORI_LANES)) {
     if (!f.endsWith('.json')) continue
     try {
@@ -56,8 +57,9 @@ const mapped = (): Record<string, Mapped> => {
   return out
 }
 
-// Always-on lanes that report on their own (kakao-push mirrors every Kakao send to Discord): no turn/progress wakes for the lead.
-const QUIET = new Set(['kakao-family', 'kakao-owner', 'kakao-friend', 'kakao-acme-chat'])
+// KakaoTalk lanes are always on and report on their own (kakao-push mirrors every Kakao send to Discord): no
+// turn/progress wakes for the lead. A lane is a KakaoTalk lane when its key starts with kakao-.
+const isQuiet = (key: string) => key.startsWith('kakao-')
 
 // "gone" is confirmed, not guessed. `herdr agent list` only lists panes whose agent it has
 // detected, so one poll can miss a live pane while its agent restarts or is re-detected; the old
@@ -91,7 +93,7 @@ export function confirmGone(
 const goneState: GoneState = { last, misses: new Map<string, number>() }
 
 export async function runWatcher(): Promise<void> {
-console.log('OMOCAT_HERDR_READY')
+console.log('OMODORI_HERDR_READY')
 while (true) {
   try {
     const list = await agents()
@@ -103,9 +105,9 @@ while (true) {
       const session = sessions.find((s) => s.pane === a.pane_id)
       if (!first && prev !== a.agent_status) {
         if (a.agent_status === 'blocked') {
-          console.log(`OMOCAT_HERDR ${JSON.stringify({ event: 'blocked', pane: a.pane_id, agent: a.agent, cwd: a.cwd, session: session?.key ?? null })}`)
-        } else if (session && !QUIET.has(session.key) && prev === 'working' && (a.agent_status === 'done' || a.agent_status === 'idle')) {
-          console.log(`OMOCAT_HERDR ${JSON.stringify({ event: 'turn_done', pane: a.pane_id, session: session.key, thread: session.thread })}`)
+          console.log(`OMODORI_HERDR ${JSON.stringify({ event: 'blocked', pane: a.pane_id, agent: a.agent, cwd: a.cwd, session: session?.key ?? null })}`)
+        } else if (session && !isQuiet(session.key) && prev === 'working' && (a.agent_status === 'done' || a.agent_status === 'idle')) {
+          console.log(`OMODORI_HERDR ${JSON.stringify({ event: 'turn_done', pane: a.pane_id, session: session.key, thread: session.thread })}`)
         }
       }
       last.set(a.pane_id, a.agent_status)
@@ -113,63 +115,63 @@ while (true) {
         const screen = await screenOf(a.pane_id)
         const isAsking = questionUiAtBottom(screen)
         if (isAsking && !asking.has(a.pane_id) && !first) {
-          console.log(`OMOCAT_HERDR ${JSON.stringify({ event: 'question', pane: a.pane_id, agent: a.agent, cwd: a.cwd, session: session?.key ?? null })}`)
+          console.log(`OMODORI_HERDR ${JSON.stringify({ event: 'question', pane: a.pane_id, agent: a.agent, cwd: a.cwd, session: session?.key ?? null })}`)
         }
         if (isAsking || asking.has(a.pane_id) || buttons.store.openForPane(a.pane_id).length > 0) {
           try {
             const info = { pane: a.pane_id, cwd: a.cwd, session: session ? { key: session.key, thread: session.thread, sessionId: session.sessionId } : null }
             const r = await syncPaneQuestion(info, screen, buttons)
-            if (r.posted) console.log(`OMOCAT_HERDR ${JSON.stringify({ event: 'question_posted', pane: a.pane_id, session: session?.key ?? null, ask: r.posted.id, channel: r.posted.channel, messages: r.posted.messageIds, questions: r.posted.questions.map((q) => q.text) })}`)
-            for (const c of r.closed) console.log(`OMOCAT_HERDR ${JSON.stringify({ event: 'question_closed', pane: a.pane_id, ask: c.id, status: c.status, note: c.note })}`)
+            if (r.posted) console.log(`OMODORI_HERDR ${JSON.stringify({ event: 'question_posted', pane: a.pane_id, session: session?.key ?? null, ask: r.posted.id, channel: r.posted.channel, messages: r.posted.messageIds, questions: r.posted.questions.map((q) => q.text) })}`)
+            for (const c of r.closed) console.log(`OMODORI_HERDR ${JSON.stringify({ event: 'question_closed', pane: a.pane_id, ask: c.id, status: c.status, note: c.note })}`)
           } catch (err) {
-            console.log(`omomeow-herdr-watch buttons error: ${(err as Error).message}`)
+            console.log(`omodori-herdr-watch buttons error: ${(err as Error).message}`)
           }
         }
         if (isAsking) asking.add(a.pane_id)
         else asking.delete(a.pane_id)
         const fb = screen.split('\n').slice(-6).join('\n').match(FALLBACK_RE)?.[1] ?? ''
         if (fb && fb !== fallbackSeen.get(a.pane_id) && !first) {
-          console.log(`OMOCAT_HERDR ${JSON.stringify({ event: 'fallback', pane: a.pane_id, model: fb, session: session?.key ?? null, thread: session?.thread ?? null })}`)
+          console.log(`OMODORI_HERDR ${JSON.stringify({ event: 'fallback', pane: a.pane_id, model: fb, session: session?.key ?? null, thread: session?.thread ?? null })}`)
         }
         fallbackSeen.set(a.pane_id, fb)
       }
     }
     for (const s of sessions) {
-      if (s.thread && byPane.get(s.pane)?.agent_status === 'working' && !QUIET.has(s.key)) {
+      if (s.thread && byPane.get(s.pane)?.agent_status === 'working' && !isQuiet(s.key)) {
         const due = progressAt.get(s.key) ?? Date.now() + PROGRESS_EVERY_MS
         if (Date.now() >= due) {
-          console.log(`OMOCAT_HERDR ${JSON.stringify({ event: 'progress_due', session: s.key, pane: s.pane, thread: s.thread })}`)
+          console.log(`OMODORI_HERDR ${JSON.stringify({ event: 'progress_due', session: s.key, pane: s.pane, thread: s.thread })}`)
           progressAt.set(s.key, Date.now() + PROGRESS_EVERY_MS)
         } else if (!progressAt.has(s.key)) progressAt.set(s.key, due)
       }
     }
     for (const g of confirmGone(sessions, (pane) => byPane.has(pane), goneState, first)) {
-      console.log(`OMOCAT_HERDR ${JSON.stringify({ event: 'gone', pane: g.pane, session: g.session })}`)
+      console.log(`OMODORI_HERDR ${JSON.stringify({ event: 'gone', pane: g.pane, session: g.session })}`)
     }
     first = false
   } catch (err) {
-    console.log(`omomeow-herdr-watch error: ${(err as Error).message}`)
+    console.log(`omodori-herdr-watch error: ${(err as Error).message}`)
   }
   await Bun.sleep(10_000)
 }
 }
 
-/** One supervisor event as the OMOCAT_HERDR line herdr-source consumers already parse; null for kinds they never saw. */
+/** One supervisor event as the OMODORI_HERDR line herdr-source consumers already parse; null for kinds they never saw. */
 export function rpcEventLine(ev: any): string | null {
   if (!ev || typeof ev.lane !== 'string') return null
   switch (ev.kind) {
     case 'lane.turn_done':
-      if (QUIET.has(ev.lane)) return null
-      return `OMOCAT_HERDR ${JSON.stringify({ event: 'turn_done', pane: ev.pane, session: ev.lane, thread: ev.thread ?? null, source: 'rpc', id: ev.id, turn_epoch: ev.data?.turn_epoch ?? null })}`
+      if (isQuiet(ev.lane)) return null
+      return `OMODORI_HERDR ${JSON.stringify({ event: 'turn_done', pane: ev.pane, session: ev.lane, thread: ev.thread ?? null, source: 'rpc', id: ev.id, turn_epoch: ev.data?.turn_epoch ?? null })}`
     case 'lane.gone':
-      return `OMOCAT_HERDR ${JSON.stringify({ event: 'gone', pane: ev.pane, session: ev.lane, source: 'rpc', id: ev.id })}`
+      return `OMODORI_HERDR ${JSON.stringify({ event: 'gone', pane: ev.pane, session: ev.lane, source: 'rpc', id: ev.id })}`
     case 'lane.question':
-      return `OMOCAT_HERDR ${JSON.stringify({ event: 'question', pane: ev.pane, agent: null, cwd: null, session: ev.lane, source: 'rpc', id: ev.id })}`
+      return `OMODORI_HERDR ${JSON.stringify({ event: 'question', pane: ev.pane, agent: null, cwd: null, session: ev.lane, source: 'rpc', id: ev.id })}`
     default: return null
   }
 }
 
-const SUPERVISOR_EVENTS = `${process.env.OMOCAT_HOME ?? `${process.env.HOME}/.omocat`}/events/supervisor.ndjson`
+const SUPERVISOR_EVENTS = `${doriHome()}/events/supervisor.ndjson`
 const printRpc = (line: string) => {
   let ev: any
   try { ev = JSON.parse(line) } catch { return }
@@ -188,7 +190,7 @@ export async function runRpcWatcher(opts: { once: boolean; sinceMin: number }): 
     }
     return
   }
-  console.log('OMOCAT_HERDR_READY')
+  console.log('OMODORI_HERDR_READY')
   const p = Bun.spawn(['tail', '-n', '0', '-F', SUPERVISOR_EVENTS], { stdout: 'pipe', stderr: 'ignore' })
   let buf = ''
   for await (const chunk of p.stdout.pipeThrough(new TextDecoderStream())) {

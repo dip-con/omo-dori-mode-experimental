@@ -15,11 +15,11 @@ test('parseFooter reads K/M units', () => {
 })
 
 test('contextEvent proposes a fresh lane-transition for every lane kind', () => {
-  expect(contextEvent('acme-rag-build', 'w1V:p3', 410_000, 1_000_000)).toBe(
-    'LANE_CONTEXT acme-rag-build pane=w1V:p3 ctx=410K/41.0% -> propose: bun ~/.omocat/lane-transition.ts acme-rag-build --fresh --reason manual (after its turn)',
+  expect(contextEvent('app-build', 'w1V:p3', 410_000, 1_000_000)).toBe(
+    'LANE_CONTEXT app-build pane=w1V:p3 ctx=410K/41.0% -> propose: bun ~/.omodori/lane-transition.ts app-build --fresh --reason manual (after its turn)',
   )
-  expect(contextEvent('kakao-acme-chat', 'wJ:pC', 410_000, 1_000_000)).toBe(
-    'LANE_CONTEXT kakao-acme-chat pane=wJ:pC ctx=410K/41.0% -> propose: bun ~/.omocat/lane-transition.ts kakao-acme-chat --fresh --reason manual (after its turn)',
+  expect(contextEvent('kakao-work', 'wJ:pC', 410_000, 1_000_000)).toBe(
+    'LANE_CONTEXT kakao-work pane=wJ:pC ctx=410K/41.0% -> propose: bun ~/.omodori/lane-transition.ts kakao-work --fresh --reason manual (after its turn)',
   )
 })
 

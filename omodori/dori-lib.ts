@@ -1,11 +1,11 @@
 // Shared helpers for the Dori build modules (heartbeat, decision inbox, CEO weekly).
-// Discord posts go through the omocat bot (same credentials as oc.ts / buttons.ts).
+// Discord posts go through the omodori bot (same credentials as oc.ts / buttons.ts).
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { redactSecrets } from './redact'
-import { cfg, omocatHome } from './config'
+import { cfg, doriHome } from './config'
 
 export const HOME = process.env.HOME!
-export const DORI = omocatHome()
+export const DORI = doriHome()
 export const GENERAL = cfg.discord.generalChannel // #일반
 export const INBOX = cfg.discord.inboxChannel // #인박스 (decision inbox)
 export const CEO_THREAD = cfg.discord.ceoThread // #일반 > CEO 주간 브리핑
@@ -52,7 +52,7 @@ export async function withLock<T>(name: string, fn: () => T | Promise<T>): Promi
   try { return await fn() } finally { rmSync(lock, { recursive: true, force: true }) }
 }
 
-const token = () => JSON.parse(readFileSync(`${HOME}/.config/agent-messenger/discordbot-credentials.json`, 'utf8')).bots.omocat.token as string
+const token = () => JSON.parse(readFileSync(`${HOME}/.config/agent-messenger/discordbot-credentials.json`, 'utf8')).bots[cfg.discord.botName].token as string
 const DISCORD_LIMIT = 2000
 const FENCE = /^\s*(```+|~~~+)/
 // The fence opener still open after `text` (given the one open before it), or undefined when balanced.
@@ -111,7 +111,7 @@ export async function post(channel: string, text: string): Promise<string[]> {
       try {
         const res = await fetch(`https://discord.com/api/v10/channels/${channel}/messages`, {
           method: 'POST',
-          headers: { Authorization: `Bot ${token()}`, 'Content-Type': 'application/json', 'User-Agent': 'DiscordBot (omocat, 1.0)' },
+          headers: { Authorization: `Bot ${token()}`, 'Content-Type': 'application/json', 'User-Agent': 'DiscordBot (omodori, 1.0)' },
           body,
         })
         status = res.status

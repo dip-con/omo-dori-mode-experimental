@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { appendEvent, bootAtMs, patchLane, processStartMs, readMap, RegistryError, updateDoriLane, withLaneLease } from './registry'
 import { closeLane, type LifecycleDeps, reopenLane } from './sess'
 
-const ROOT = process.env.OMOCAT_HOME ?? mkdtempSync(join(tmpdir(), 'omocat-s3-'))
+const ROOT = process.env.OMODORI_HOME ?? mkdtempSync(join(tmpdir(), 'omodori-s3-'))
 const DORI_REGISTRY = `${process.env.HOME}/.dori/src/skills/dori-mode/scripts/src/registry.ts`
 let n = 0
 const home = () => { const d = join(ROOT, `t${++n}-${process.pid}`); mkdirSync(d, { recursive: true }); return d }
@@ -192,7 +192,7 @@ test('a foreign live holder appearing after start raises lane.holder_conflict ex
   expect(events(h).filter((e) => e.kind === 'lane.holder_conflict').length).toBe(1)
 })
 
-test('OMOMEOW_FRESH reopen takes a new id, skips the holder check and records the old id in lineage.sessions', async () => {
+test('OMODORI_FRESH reopen takes a new id, skips the holder check and records the old id in lineage.sessions', async () => {
   const h = home()
   seedMap(h, { a: entry('a') })
   const file = sessionsFixture(h, 'sess-old')
@@ -204,16 +204,16 @@ test('OMOMEOW_FRESH reopen takes a new id, skips the holder check and records th
   expect([readMap(h).a!.sessionId, readMap(h).a!.lineage?.sessions]).toEqual(['sess-new', ['sess-old']])
 })
 
-test.skipIf(!existsSync(DORI_REGISTRY))('cross-repo: omocat updateDoriLane and dori Registry.update on one lanes/<key>.json keep both fields', async () => {
+test.skipIf(!existsSync(DORI_REGISTRY))('cross-repo: omodori updateDoriLane and dori Registry.update on one lanes/<key>.json keep both fields', async () => {
   const h = home()
   const state = join(h, 'dori-state')
   const lanes = join(state, 'lanes')
   mkdirSync(lanes, { recursive: true })
   writeFileSync(join(lanes, 'xrepo.json'), JSON.stringify({ key: 'xrepo', title: 'x', thread: 'none', brief: 'b', done: 'd', openedAt: 'now' }))
   const src = join(import.meta.dir, 'registry.ts')
-  const omocat = Bun.spawn(['bun', '-e', `import { updateDoriLane } from ${JSON.stringify(src)}; for (let i = 0; i < 40; i++) await updateDoriLane('xrepo', (c) => ({ ...c, session: String(Number(c?.session ?? 0) + 1) }), { dir: ${JSON.stringify(lanes)} })`], { stdout: 'inherit', stderr: 'inherit' })
+  const omodori = Bun.spawn(['bun', '-e', `import { updateDoriLane } from ${JSON.stringify(src)}; for (let i = 0; i < 40; i++) await updateDoriLane('xrepo', (c) => ({ ...c, session: String(Number(c?.session ?? 0) + 1) }), { dir: ${JSON.stringify(lanes)} })`], { stdout: 'inherit', stderr: 'inherit' })
   const dori = Bun.spawn(['bun', '-e', `import { Registry } from ${JSON.stringify(DORI_REGISTRY)}; const r = new Registry(${JSON.stringify(state)}); for (let i = 0; i < 40; i++) await r.update('xrepo', (c) => ({ ...c, lastNudgeAt: (c?.lastNudgeAt ?? 0) + 1 }))`], { stdout: 'inherit', stderr: 'inherit' })
-  expect(await Promise.all([omocat.exited, dori.exited])).toEqual([0, 0])
+  expect(await Promise.all([omodori.exited, dori.exited])).toEqual([0, 0])
   const got = JSON.parse(readFileSync(join(lanes, 'xrepo.json'), 'utf8'))
   expect([got.session, got.lastNudgeAt]).toEqual(['40', 40])
   expect(await updateDoriLane('xrepo', () => null, { dir: lanes })).toEqual(got)
@@ -222,7 +222,7 @@ test.skipIf(!existsSync(DORI_REGISTRY))('cross-repo: omocat updateDoriLane and d
 test('rollback-fields strips only the named keys under the lock; unlock --if-dead refuses a live lock', async () => {
   const h = home()
   seedMap(h, { a: entry('a', { generation: 4, lineage: { sessions: ['x'] }, endpoint: { socket: 's' } }), b: entry('b', { generation: 1 }) })
-  const cli = (...args: string[]) => Bun.spawn(['bun', join(import.meta.dir, 'registry.ts'), ...args], { env: { ...process.env, OMOCAT_HOME: h }, stdout: 'pipe' })
+  const cli = (...args: string[]) => Bun.spawn(['bun', join(import.meta.dir, 'registry.ts'), ...args], { env: { ...process.env, OMODORI_HOME: h }, stdout: 'pipe' })
   const p = cli('rollback-fields', '--fields', 'generation,lineage,endpoint')
   expect(await p.exited).toBe(0)
   const m = readMap(h)

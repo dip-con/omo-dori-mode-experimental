@@ -1,8 +1,8 @@
-// Dandori supervisor (redesign S4 observation + S9 policies, docs/dori-redesign/final.md §2.3-§2.5). The observer never
+// dori supervisor (redesign S4 observation + S9 policies). The observer never
 // acts by itself; the S9 policies below (quota transition, session_replaced adopt, nudge, reap EMPTY_TAB) act only for
-// lanes a flag file enables, and record every act in the ops ledger OMOCAT/ops/policy/<opId>.json
+// lanes a flag file enables, and record every act in the ops ledger DORI_HOME/ops/policy/<opId>.json
 // (planned -> attempted -> verified | failed | ambiguous, with read-back; ambiguous is never retried, it asks).
-// Policy flags (OMOCAT/flags/): supervisor.no-policies = kill switch (observe only); policies.on = every policy, every lane;
+// Policy flags (DORI_HOME/flags/): supervisor.no-policies = kill switch (observe only); policies.on = every policy, every lane;
 // policy.<quota|adopt|nudge|reap> = that policy for the keys listed in the file (empty file = every lane).
 // Without a flag a policy proposes only: quota/nudge/reap proposals stay with the legacy sweeps (LANE_QUOTA, NO-NUDGE,
 // LANE_EMPTY_TAB); adopt (no legacy proposer) emits policy.adopt_proposal (ask). Quota acts only with the per-episode
@@ -12,7 +12,7 @@
 // (+ tui `subscribe {cursor}` feed). Lane state machine: opening/idle/running/waiting_input/compacting -> offline on
 // transport_gone (or not hosted) -> gone after two registry rescans >= 20 s apart with neither endpoint nor pane.
 // lane.turn_done is emitted once on the transition to settled (idle, children known and 0 running, no running DAG run)
-// with id lane.turn_done:<durableId>:<instanceId>:<turn_epoch>. Children (S5, final.md §2.5): session_status rows whose
+// with id lane.turn_done:<durableId>:<instanceId>:<turn_epoch>. Children (S5): session_status rows whose
 // context.parent_session_id/root_session_id is the lane (worker rows exist only because include_workers is sent), the
 // senpi task store (in-process subagents RPC cannot see) and herdr-dag runs. children.state is 'unknown' before the first
 // census, while a host is unreachable/disconnected or reports workers hidden, and when a running DAG file is > 10 min
@@ -21,20 +21,21 @@
 // (instanceId, epoch) per lane; a snapshot converges without side effects and only a newer turn is emitted.
 //   bun dori-supervisor.ts --once [--json]     one census, print the lane-status snapshot, write nothing
 //   bun dori-supervisor.ts                     daemon (launchd); runs only while flags/supervisor.observe exists
-// Files (under OMOCAT_HOME, default ~/.omocat): events/supervisor.ndjson, state/supervisor.json, lane-status.json.
+// Files (under OMODORI_HOME, default ~/.omodori): events/supervisor.ndjson, state/supervisor.json, lane-status.json.
 import { appendFileSync, chmodSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { CLAUDE_ACCOUNTS } from './lane-classify'
 import { accountCheck, accountHeadroom, isClaudeModel, pickAccount, switchBackStep } from './policy-lib'
 import {
-  acquireDirLock, addLineage, type Entry, omocatHome, patchLane, readMap, RegistryError, updateDoriLane, withLaneLease, type LaneMap,
+  acquireDirLock, addLineage, type Entry, doriHome, patchLane, readMap, RegistryError, updateDoriLane, withLaneLease, type LaneMap,
 } from './registry'
+import { isLeadKey, homeRef } from './config'
 import {
   type DagFile, type Endpoint, type EndpointKind, type HostStatusRow, type Link, type OpenLink, SUBSCRIBE_SESSIONS,
   hostStatus, openSocketLink, panesAlive, readDagRuns, scanEndpoints,
 } from './supervisor-sources'
 
-export const supPaths = (home = omocatHome()) => ({
+export const supPaths = (home = doriHome()) => ({
   events: join(home, 'events', 'supervisor.ndjson'),
   state: join(home, 'state', 'supervisor.json'),
   lock: join(home, 'state', 'supervisor.lock'),
@@ -195,7 +196,7 @@ export class Supervisor {
     const map = this.deps.loadMap()
     const seen = new Set<string>()
     for (const e of Object.values(map)) {
-      if (e.status !== 'open' || e.key.startsWith('dandori-lead')) continue
+      if (e.status !== 'open' || isLeadKey(e.key)) continue
       seen.add(e.key)
       const cur = this.lanes.get(e.key)
       const prevId = cur?.durableId ?? this.persist.laneIds?.[e.key]?.durableId
@@ -808,7 +809,7 @@ export class Policies {
       if (!entry || entry.status !== 'open') continue
       if (this.ledger.find((o) => o.policy === 'adopt' && o.key === rep.key && o.data.to === rep.to)) continue
       if (!inScope(policyScope(this.home, 'adopt'), rep.key)) {
-        this.ask(rep.key, 'policy.adopt_proposal', id, { from: rep.from, to: rep.to, via: rep.via, command: `bun ~/.omocat/dori-supervisor.ts --adopt ${rep.key} --session ${rep.to}` })
+        this.ask(rep.key, 'policy.adopt_proposal', id, { from: rep.from, to: rep.to, via: rep.via, command: `bun ${homeRef()}/dori-supervisor.ts --adopt ${rep.key} --session ${rep.to}` })
         continue
       }
       const op = this.ledger.create('adopt', rep.key, { from: rep.from, to: rep.to, via: rep.via })
@@ -855,10 +856,10 @@ export class Policies {
         detail = q.detail
       }
       if (this.ledger.find((o) => o.policy === 'quota' && o.data.episode === episode)) continue
-      const command = target ? `bun ~/.omocat/lane-transition.ts ${lane.key} --fresh --account ${target} --reason quota` : null
+      const command = target ? `bun ${homeRef()}/lane-transition.ts ${lane.key} --fresh --account ${target} --reason quota` : null
       if (!target) { this.ask(lane.key, 'policy.quota_proposal', `${episode}:no-target`, { episode, detail, why: 'no Claude account with fresh usage headroom' }); continue }
       if (!this.approved(lane.key, episode)) {
-        this.ask(lane.key, 'policy.quota_proposal', episode, { episode, detail, target, command, approve: `echo '${episode}' > ~/.omocat/flags/auto-migrate.${lane.key}` })
+        this.ask(lane.key, 'policy.quota_proposal', episode, { episode, detail, target, command, approve: `echo '${episode}' > ${homeRef()}/flags/auto-migrate.${lane.key}` })
         continue
       }
       const op = this.ledger.create('quota', lane.key, { episode, target, g: lane.generation, detail, sim: !!sim })
@@ -898,7 +899,7 @@ export class Policies {
       const cur = st.switchBack[key]?.ref === ref ? st.switchBack[key]! : { ref, orig: m.from, count: 0 }
       const step = switchBackStep(cur.count, accountCheck(accountHeadroom(m.from, usage, auth, now)))
       st.switchBack[key] = { ...cur, count: step.count }
-      if (step.fire) this.ask(key, 'lane.quota_reset', `${key}:${ref}`, { orig: m.from, checks: step.count, command: `bun ~/.omocat/lane-transition.ts ${key} --fresh --account ${m.from} --reason manual` })
+      if (step.fire) this.ask(key, 'lane.quota_reset', `${key}:${ref}`, { orig: m.from, checks: step.count, command: `bun ${homeRef()}/lane-transition.ts ${key} --fresh --account ${m.from} --reason manual` })
     }
   }
 
@@ -910,7 +911,7 @@ export class Policies {
     for (const dl of this.p.doriLanes()) {
       if (dl.closedAt || (dl.status ?? 'working') !== 'working' || !inScope(scope, dl.key)) continue
       const e = map[dl.key]
-      if (!e || e.status !== 'open' || e.key.startsWith('dandori-lead')) continue
+      if (!e || e.status !== 'open' || isLeadKey(e.key)) continue
       const g = e.generation ?? 0
       const heard = dl.lastReplyAt ?? Date.parse(dl.openedAt)
       let s = st.nudges[dl.key]
@@ -1124,7 +1125,7 @@ const briefFor = (home: string, key: string): string => {
 export const adoptSeedText = (home: string) => (key: string, g: number) =>
   `[레인 복구] ${key}: 세션이 교체됐다(/handoff 등). 이 세션이 레인 ${key}의 generation ${g}다. 아래 브리프를 다시 읽고, 이미 한 일은 다시 하지 말고 이어서 해라.\n\n## 브리프\n${briefFor(home, key)}\n`
 
-export async function livePolicyDeps(home = omocatHome()): Promise<{ deps: PolicyDeps; adoptCtx: AdoptCtx }> {
+export async function livePolicyDeps(home = doriHome()): Promise<{ deps: PolicyDeps; adoptCtx: AdoptCtx }> {
   const H = process.env.HOME!
   const { rpc, transportFor, receipt } = await import('./rpc')
   const { liveDeps: herdrDeps } = await import('./deliver')
@@ -1223,7 +1224,7 @@ export class Watchdog {
   private event(kind: string, severity: 'act' | 'ask', idTail: string, data: Record<string, unknown>) {
     const id = `${kind}:${idTail}`
     console.log(`SUPERVISOR_WATCHDOG ${kind} ${JSON.stringify(data)}`)
-    try { appendSupEvent(this.home, { id, kind, severity, lane: 'dandori-supervisor', durableId: '', generation: 0, pane: null, thread: null, data }) }
+    try { appendSupEvent(this.home, { id, kind, severity, lane: 'dori-supervisor', durableId: '', generation: 0, pane: null, thread: null, data }) }
     catch (e: any) { console.log(`SUPERVISOR_WATCHDOG_EVENT_FAILED ${kind} ${e?.message ?? e}`) }
   }
   check() {
@@ -1254,14 +1255,14 @@ export class Watchdog {
   }
 }
 
-export const liveDeps = (write: boolean, home = omocatHome()): SupDeps => ({
+export const liveDeps = (write: boolean, home = doriHome()): SupDeps => ({
   home, now: Date.now, openLink: openSocketLink, scanEndpoints: () => scanEndpoints(), hostStatus: () => hostStatus(),
   panesAlive, dagRuns: () => readDagRuns(), taskRecords: (cwds) => readTaskRecords(cwds), loadMap: () => readMap(home), connectTimeoutMs: 2_000, requestTimeoutMs: 10_000,
   write, log: (l) => console.log(l),
 })
 
 async function daemon() {
-  const home = omocatHome()
+  const home = doriHome()
   const p = supPaths(home)
   mkdirSync(dirname(p.lock), { recursive: true, mode: 0o700 })
   chmodSync(dirname(p.lock), 0o700)
@@ -1309,7 +1310,7 @@ if (import.meta.main) {
   if (argv.includes('--adopt')) {
     const key = argv[argv.indexOf('--adopt') + 1], to = argv[argv.indexOf('--session') + 1]
     if (!key || !to || !argv.includes('--session')) { console.log('usage: dori-supervisor.ts --adopt <key> --session <durableId>'); process.exit(2) }
-    const home = omocatHome()
+    const home = doriHome()
     const { adoptCtx } = await livePolicyDeps(home)
     const entry = readMap(home)[key]
     const op = adoptCtx.ledger.create('adopt', key, { from: entry?.sessionId ?? null, to, via: 'manual' })

@@ -5,9 +5,9 @@ import { BOT_ID, BURST, createBurstBuffer, looksUnfinished, waitsForMore, create
 import { CONTEXT_NOTE, judge, judgeBurst, ROOMS, route, settleBatch } from '../kakao-push'
 import { SECRETARY_ID } from '../kakao-secretary-gate'
 
-const group: FilterRoom = { name: 'group', lane: 'kakao-friend', owner: ['1'] }
-const docs: FilterRoom = { name: 'docs', lane: 'kakao-acme-docs', owner: ['1'] }
-const sudden: FilterRoom = { name: 'sudden', lane: 'kakao-family', owner: ['1'] }
+const group: FilterRoom = { name: 'group', lane: 'kakao-group', owner: ['1'] }
+const docs: FilterRoom = { name: 'docs', lane: 'kakao-docs', owner: ['1'] }
+const sudden: FilterRoom = { name: 'sudden', lane: 'kakao-chat', owner: ['1'] }
 const direct: FilterRoom = { name: 'direct', lane: 'kakao-owner', owner: ['1'], ownerOnly: true }
 
 let seq = 0
@@ -34,9 +34,9 @@ for (const [room, text, o, reason] of [
   [direct, '오늘 뭐해', {}, 'direct_room'],
   [group, '이거 봐줘', { mention: BOT_ID }, 'mention'],
   [group, '응 그거', { reply: BOT_ID }, 'reply_to_bot'],
-  [group, '장도리야 이거 봐', {}, 'name_call'],
-  [sudden, '단도리 있어?', {}, 'name_call'],
-  [docs, '비서야 문서 고쳐줘', {}, 'name_call'],
+  [group, '모모야 이거 봐', {}, 'name_call'],
+  [sudden, '모모 있어?', {}, 'name_call'],
+  [docs, '루루야 문서 고쳐줘', {}, 'name_call'],
   [sudden, '전적 홍길동', {}, 'command'],
   [sudden, '{"feedType":4}', { type: 0 }, 'feed'],
 ] as const) {
@@ -47,15 +47,15 @@ for (const [room, text, o, reason] of [
   })
 }
 
-test('bot names are per room: 도리 is not a name call in the secretary room', async () => {
+test('bot names are per room: 모모 is not a name call in the docs room', async () => {
   const s = setup()
-  expect((await s.run(docs, '도리 얘기 들었어?')).decision).toBe('wake')
+  expect((await s.run(docs, '모모 얘기 들었어?')).decision).toBe('wake')
   expect(s.calls).toHaveLength(1)
 })
 
 test('a photo from someone who just woke the bot wakes; a stranger photo goes to Jev', async () => {
   const s = setup(() => answer({ seeks_bot: 0.1 }))
-  await s.run(group, '장도리야 이거 봐', { sender: 9 })
+  await s.run(group, '모모야 이거 봐', { sender: 9 })
   expect(await s.run(group, '', { sender: 9, photo: true })).toMatchObject({ decision: 'hard-wake', reason: 'photo_by_engaged' })
   expect((await s.run(group, '', { sender: 8, photo: true })).decision).toBe('skip')
   expect(s.calls).toHaveLength(1)
@@ -142,15 +142,15 @@ test('skipped batches are held and reach the lane as context in the next woken b
   expect(settleBatch('c1', ['a: 점심 뭐 먹지'], false)).toBeNull()
   expect(settleBatch('c1', ['b: ㅋㅋ'], false)).toBeNull()
   expect(settleBatch('c2', ['x: 다른 방'], true)).toEqual(['x: 다른 방'])
-  expect(settleBatch('c1', ['a: 장도리야 추천해줘'], true)).toEqual([CONTEXT_NOTE, '[문맥] a: 점심 뭐 먹지', '[문맥] b: ㅋㅋ', 'a: 장도리야 추천해줘'])
+  expect(settleBatch('c1', ['a: 모모야 추천해줘'], true)).toEqual([CONTEXT_NOTE, '[문맥] a: 점심 뭐 먹지', '[문맥] b: ㅋㅋ', 'a: 모모야 추천해줘'])
   expect(settleBatch('c1', ['a: 고마워'], true)).toEqual(['a: 고마워'])
   for (let i = 0; i < 20; i++) settleBatch('c3', [`l${i}`], false)
   expect(settleBatch('c3', ['call'], true)).toHaveLength(14)
 })
 
-// [ACME] 테스트 room triage (주인 10-21): respond / collect / discard.
+// [작업] 문서방 room triage (주인 10-21): respond / collect / discard.
 const DOCS_CHAT = '18000000000000001'
-const docsRoom: FilterRoom = { name: '[ACME] 테스트', lane: 'kakao-acme-docs', owner: ['1'] }
+const docsRoom: FilterRoom = { name: '[작업] 문서방', lane: 'kakao-docs', owner: ['1'], maskPii: true, stripSelf: true }
 const docsLine = (text: string, o: { sender?: number; mention?: boolean; file?: string } = {}) =>
   `{"chat_id":${DOCS_CHAT},"is_from_me":false,"log_id":${++seq},"message_type":${o.file ? 18 : 1},"sender_id":${o.sender ?? 700},` +
   `${o.file ? `"file_name":"${o.file}",` : ''}${o.mention ? `"mentioned_user_ids":["${SECRETARY_ID}"],` : ''}` +
@@ -182,7 +182,7 @@ const withDocsFilter = async (on: boolean, fn: () => Promise<void>) => {
 
 test('docs room: a direct call, mention or reply still responds as [호출] without asking Jev', () => withDocsFilter(true, async () => {
   const s = docsSetup({ doc_work_request: 0 })
-  expect((await s.send('강비서 견적 검토해줘', { sender: 701 }))).toMatchObject({ judged: 'respond', text: expect.stringContaining('[호출]') })
+  expect((await s.send('루루 견적 검토해줘', { sender: 701 }))).toMatchObject({ judged: 'respond', text: expect.stringContaining('[호출]') })
   expect((await s.send('이거 봐줘', { sender: 702, mention: true }))?.text).toContain('[호출]')
   expect(s.calls).toHaveLength(0)
   expect(s.logs.map((l) => [l.decision, l.reason, l.triage])).toEqual([['hard-wake', 'gate_called', 'respond'], ['hard-wake', 'gate_called', 'respond']])
@@ -223,7 +223,7 @@ test('docs room: chat and reactions are discarded (reactions without asking Jev)
 
 test('docs room fail-open keeps the old gate behavior: a 5-minute follow-up responds as [후속후보], other lines drop', () => withDocsFilter(true, async () => {
   const s = docsSetup('error')
-  expect((await s.send('강비서 표 만들어줘', { sender: 709 }))?.text).toContain('[호출]')
+  expect((await s.send('루루 표 만들어줘', { sender: 709 }))?.text).toContain('[호출]')
   expect((await s.send('첨부 자료 더 줄게', { sender: 709 }))).toMatchObject({ judged: 'respond', text: expect.stringContaining('[후속후보]') })
   expect(await s.send('오늘 점심 뭐 먹지', { sender: 710 })).toBeNull()
   expect(s.logs.slice(1).map((l) => [l.decision, l.reason])).toEqual([['fail-open', 'http-503'], ['fail-open', 'http-503']])
@@ -293,7 +293,7 @@ test('docs burst: split lines are judged once and all go to the lane when any pa
 
 test('docs burst: a direct call anywhere in the burst makes the whole burst respond without Jev', () => withDocsFilter(true, async () => {
   const s = docsSetup({ doc_work_request: 0 })
-  const out = await s.sendBurst([['어제 받은 파일 말인데', { sender: 721 }], ['강비서 이거 엑셀로 바꿔줘', { sender: 721 }]])
+  const out = await s.sendBurst([['어제 받은 파일 말인데', { sender: 721 }], ['루루 이거 엑셀로 바꿔줘', { sender: 721 }]])
   expect(s.calls).toHaveLength(0)
   expect(out.map((r) => r.text.split(' ')[0])).toEqual(['[요청판단]', '[호출]'])
 }))
@@ -320,7 +320,7 @@ test('follow-up does not answer bare reactions or talk aimed at someone else', (
 
 test('follow-up after the secretary was woken for the same person in the last 15 minutes', () => withDocsFilter(true, async () => {
   const s = docsSetup({ doc_work_request: 0.1, useful_context: 0.1, only_reaction: 0.1, to_other_person: 0.1 }, [])
-  expect((await s.send('강비서 회의록 양식 만들어줘', { sender: 732 }))?.judged).toBe('respond')
+  expect((await s.send('루루 회의록 양식 만들어줘', { sender: 732 }))?.judged).toBe('respond')
   expect((await s.send('참석자 칸도 넣어줘', { sender: 733 }))).toBeNull()
   expect((await s.send('참석자 칸도 넣어줘', { sender: 732 }))?.judged).toBe('respond')
 }))

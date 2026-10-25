@@ -9,7 +9,7 @@
 // A lane that is working is never quit. Recovered problems are logged for the morning line, not posted.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { DORI, GENERAL, HOME, SESSIONS_ROOT, type Lane, ageMin, appendJsonl, flag, kst, mtime, openLanes, opt, post, readJson, readJsonl, writeJson } from './dori-lib'
-import { cfg, label } from './config'
+import { cfg, label, kakaoLogs } from './config'
 
 const DIR = process.env.HEARTBEAT_DIR ?? `${DORI}/heartbeat`
 const STATE = `${DIR}/state.json`
@@ -17,7 +17,7 @@ export const EVENTS = `${DIR}/events.jsonl`
 const ARGV = `${DIR}/lane-argv.json`
 const UID = process.getuid!()
 const KKA_LOG = process.env.HEARTBEAT_KKA_LOG ?? `${HOME}/Library/Logs/kakao-archive/sync.log`
-const KAKAO_LOGS = `${HOME}/Library/Logs/dandori-kakao`
+const KAKAO_LOGS = kakaoLogs()
 const LIMITS = { kkaMin: 30, mailMin: 15, laneSilentMin: 20, diskFreeGb: 50, diskPct: 90 }
 
 export type Check = { id: string; ok: boolean; detail: string; recover?: { kind: 'kickstart'; label: string } | { kind: 'lane'; key: string; pane: string } }

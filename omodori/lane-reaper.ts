@@ -8,10 +8,10 @@
 //   bun lane-reaper.ts --apply          herdr tab close / SIGTERM leftovers; refuses the lead pane and its ancestors
 //   bun lane-reaper.ts --apply-tab <tab>  (redesign S9, used by the supervisor reap policy under the lane lease) re-plan now
 //                                       and close <tab> only if LANE_EMPTY_TAB <tab> is still proposed; exit 0 done, 1 not
-// Read-only inputs: ~/.dori/state/{lanes,approvals}, ~/.omocat/sessions-map.json, `herdr pane list`, ps, lsof.
+// Read-only inputs: ~/.dori/state/{lanes,approvals}, ~/.omodori/sessions-map.json, `herdr pane list`, ps, lsof.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { liveEnv, type GuardEnv } from './dori-guard'
-import { cfg } from './config'
+import { cfg, doriHome } from './config'
 
 const HOME = process.env.HOME!
 const H = 3_600_000
@@ -146,7 +146,7 @@ function loadLanes(): { lanes: Lane[]; approvals: Record<string, Approval>; mapT
   for (const f of existsSync(`${dir}/approvals`) ? readdirSync(`${dir}/approvals`) : []) {
     try { approvals[f] = { mtime: statSync(`${dir}/approvals/${f}`).mtimeMs, text: readFileSync(`${dir}/approvals/${f}`, 'utf8').slice(0, 400) } } catch {}
   }
-  const map = readJson(`${HOME}/.omocat/sessions-map.json`) ?? {}
+  const map = readJson(`${doriHome()}/sessions-map.json`) ?? {}
   const mapTabs: Record<string, any> = {}
   for (const [k, v] of Object.entries<any>(map)) {
     mapTabs[k] = { tab: v.tab, pane: v.pane, status: v.status, cwd: v.cwd }

@@ -4,7 +4,7 @@
 # Identity and the optional memory repo come from config.json (git.name, git.email, paths.memoryRepo, git.memoryRemote).
 export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
 set -u
-D=${OMOCAT_HOME:-$HOME/.omocat}
+D=${OMODORI_HOME:-$HOME/.omodori}
 CFG=${DORI_PORTABLE_CONFIG:-$D/config.json}
 NAME=$(jq -r '.git.name // ""' "$CFG")
 EMAIL=$(jq -r '.git.email // ""' "$CFG")

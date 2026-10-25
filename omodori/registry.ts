@@ -1,4 +1,4 @@
-// Lane registry (redesign S3, docs/dori-redesign/final.md §2.2).
+// Lane registry (redesign S3).
 // sessions-map.json is written only through patchLane: map lock (mkdir) + re-read + per-key patch + tmp+rename, with an
 // optional generation CAS. Lifecycle work (open/close/reopen/transition/reap) runs inside withLaneLease(key, op), which
 // refuses a second taker at once (lease_held) instead of queueing it.
@@ -9,19 +9,20 @@
 //   bun registry.ts get <key>
 //   bun registry.ts rollback-fields --fields a,b,c     strip v2 fields from every entry, under the map lock
 //   bun registry.ts unlock --if-dead                   remove the map lock only when its holder is gone
-// OMOCAT_HOME (default ~/.omocat) roots the map, lock, leases and events; tests point it at a temp tree.
+// OMODORI_HOME (default ~/.omodori) roots the map, lock, leases and events; tests point it at a temp tree.
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { uptime } from 'node:os'
 import { dirname, join } from 'node:path'
+import { doriHome } from './config'
 
-export const omocatHome = () => process.env.OMOCAT_HOME ?? `${process.env.HOME}/.omocat`
-export const paths = (home = omocatHome()) => ({
+export { doriHome }
+export const paths = (home = doriHome()) => ({
   home,
   map: join(home, 'sessions-map.json'),
   mapLock: join(home, 'sessions-map.lock'),
   leases: join(home, 'lane-leases'),
   events: join(home, 'events', 'registry.ndjson'),
-  doriLanes: process.env.DORI_LANES_DIR ?? (process.env.OMOCAT_HOME ? join(home, 'dori-lanes') : `${process.env.HOME}/.dori/state/lanes`),
+  doriLanes: process.env.DORI_LANES_DIR ?? (process.env.OMODORI_HOME ? join(home, 'dori-lanes') : `${process.env.HOME}/.dori/state/lanes`),
 })
 
 export class RegistryError extends Error {
@@ -110,7 +111,7 @@ export async function acquireDirLock(dir: string, opts: { waitMs?: number; pollM
   }
 }
 
-export function appendEvent(ev: { id?: string; kind: string; [k: string]: unknown }, home = omocatHome()): boolean {
+export function appendEvent(ev: { id?: string; kind: string; [k: string]: unknown }, home = doriHome()): boolean {
   const file = paths(home).events
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
   if (ev.id && (readText(file) ?? '').split('\n').some((l) => l.includes(`"id":${JSON.stringify(ev.id)}`))) return false
@@ -130,7 +131,7 @@ export type Entry = {
 }
 export type LaneMap = Record<string, Entry>
 
-export const readMap = (home = omocatHome()): LaneMap => {
+export const readMap = (home = doriHome()): LaneMap => {
   const f = paths(home).map
   return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : {}
 }
@@ -212,7 +213,7 @@ export async function withLaneLease<T>(key: string, op: LeaseOp, fn: (lease: Lea
   try { return await fn({ key, op, generation, dir }) } finally { held.release(); heldLeases.delete(held) }
 }
 
-export const leaseActive = (key: string, home = omocatHome()) => existsSync(join(paths(home).leases, key))
+export const leaseActive = (key: string, home = doriHome()) => existsSync(join(paths(home).leases, key))
 
 export async function updateDoriLane(key: string, fn: (cur: any | null) => any | null, opts: { dir?: string; waitMs?: number } = {}): Promise<any | null> {
   checkKey(key)

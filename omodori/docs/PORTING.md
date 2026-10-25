@@ -3,8 +3,8 @@
 이 폴더(`omodori/`)는 Discord·카카오톡 도리 런타임(supervisor, listener, lane 관리, 카톡 큐, 결정함, heartbeat)이다.
 lane을 띄우고 닫는 `dori` CLI와 스킬은 저장소 루트의 `skills/dori-mode`에 있다. 둘 다 설치한다.
 
-기기마다 달라지는 값은 전부 `$OMOCAT_HOME/config.json` 하나와 그 옆의 데이터 파일 몇 개에 모여 있다.
-코드에는 기본값만 들어 있다. 기본 설치 위치는 `~/.omocat`이고, `OMOCAT_HOME`으로 바꿀 수 있다.
+기기마다 달라지는 값은 전부 `$OMODORI_HOME/config.json` 하나와 그 옆의 데이터 파일 몇 개에 모여 있다.
+코드에는 기본값만 들어 있다. 기본 설치 위치는 `~/.omodori`이고, `OMODORI_HOME`으로 바꿀 수 있다.
 
 ## 1. 준비물
 
@@ -21,10 +21,10 @@ lane을 띄우고 닫는 `dori` CLI와 스킬은 저장소 루트의 `skills/dor
 
 ## 2. 비밀값 (저장소에 절대 넣지 않음)
 
-- `~/.config/agent-messenger/discordbot-credentials.json`: `{"bots":{"omocat":{"token":"..."}}}` 형식의 Discord 봇 토큰
+- `~/.config/agent-messenger/discordbot-credentials.json`: `{"bots":{"assistant":{"token":"..."}}}` 형식의 Discord 봇 토큰
 - `~/.config/agent-messenger/kakaotalk-credentials.json`: 카톡 서브기기 로그인 결과 (`agent-messenger` 로그인 절차로 생성)
-- `~/.config/omomeow/typesafe.env`: 카톡 wake-filter 분류기 키 (카톡을 안 쓰면 필요 없음)
-- `$OMOCAT_HOME/prb-admin-key.txt`: 버튼 relay(`discord.relayUrl`)를 쓸 때만
+- `~/.config/omodori/typesafe.env`: 카톡 wake-filter 분류기 키 (카톡을 안 쓰면 필요 없음)
+- `$OMODORI_HOME/prb-admin-key.txt`: 버튼 relay(`discord.relayUrl`)를 쓸 때만
 
 `.env.example`에 환경변수로 덮어쓸 수 있는 값이 정리돼 있다.
 
@@ -34,7 +34,7 @@ lane을 띄우고 닫는 `dori` CLI와 스킬은 저장소 루트의 `skills/dor
 git clone https://github.com/dip-con/omo-dori-mode-experimental.git
 cd omo-dori-mode-experimental/omodori
 ./install.sh            # dry run: 바뀌는 것 없음, 할 일만 출력
-$EDITOR ~/.omocat/config.json   # --apply 가 example 에서 만들어 준 뒤 값 채우기
+$EDITOR ~/.omodori/config.json   # --apply 가 example 에서 만들어 준 뒤 값 채우기
 ./install.sh --apply --no-load  # 코드 복사, config/데이터 파일 생성, bun install, plist 작성
 ./install.sh --apply            # 값 확인 끝나면 LaunchAgent 등록
 ```
@@ -44,7 +44,7 @@ $EDITOR ~/.omocat/config.json   # --apply 가 example 에서 만들어 준 뒤 �
 
 ## 4. config.json 체크리스트
 
-`bun ~/.omocat/config.ts --check`가 형식을 검사한다(`CONFIG_OK` / `CONFIG_ERROR ...`).
+`bun ~/.omodori/config.ts --check`가 형식을 검사한다(`CONFIG_OK` / `CONFIG_ERROR ...`).
 
 - [ ] `discord.guildId`, `discord.ownerId`: 서버 ID와 주인 계정 ID (Discord 개발자 모드 > ID 복사)
 - [ ] `discord.generalChannel`, `inboxChannel`: 일반 채널, 결정함 채널
@@ -53,15 +53,25 @@ $EDITOR ~/.omocat/config.json   # --apply 가 example 에서 만들어 준 뒤 �
 - [ ] `kakao.ragChatIds`: 문서검색 lane이 답할 수 있는 방 ID
 - [ ] `kakao.ownerRoom`: kakao-owner lane이 쓰는 방 이름(kakao-rooms.json의 `name`)
 - [ ] `kakao.archiveRoot`: 카톡 아카이브(kka) 폴더. 답장 원문을 여기서 찾는다
-- [ ] `kakao.requestsLedger`: 비서 lane의 요청 장부 JSON 경로 (없으면 비워 둠)
+- [ ] `kakao.requestsLedger`: 문서봇(gate 방) lane의 요청 장부 JSON 경로 (없으면 비워 둠)
 - [ ] `launchd.prefix`: LaunchAgent 이름 앞부분 (예: `com.yourname.dori`)
 - [ ] `launchd.services`: 설치할 서비스. 목록은 `launchagents/services.json`
 - [ ] `claudeAccounts`: lane 계정 전환에 쓰는 omo Claude 계정 이름
 - [ ] `paths.disks`: heartbeat가 여유 공간을 볼 디스크 (`/`, 외장 SSD 등)
+- [ ] `paths.dataDir`: 큐·레지스트리·sa-cache·events 폴더 (비우면 `$OMODORI_HOME`, 기본 `~/.omodori`)
+- [ ] `paths.logDir`: 로그 폴더 (기본 `~/Library/Logs/omodori`, 아래에 `kakao/`, `supervisor/`)
+- [ ] `owner.title`: lane 메시지에서 주인을 부르는 호칭 (기본 `owner`)
+- [ ] `lead.name`, `lead.keyPrefix`: 리드 이름(lane 규칙 문구), 리드 레지스트리 키 앞부분 (기본 `lead`, `dori-lead`)
+- [ ] `discord.botName`: `discordbot-credentials.json`의 `bots.<이름>` (기본 `assistant`)
+- [ ] `bots[]`: 카톡 봇. `name`, `calls`(호출어, 필수: 비우면 이름 호출이 없다), `about`(wake-filter 분류기에 주는 한 줄 설명), `lanes`(이 봇이 답하는 lane), `commands`(늘 깨우는 명령 정규식). lane이 어느 봇에도 없으면 첫 봇, 봇이 없으면 중립 `assistant`
+- [ ] `voice.initialPrompt`: 음성 받아쓰기 힌트 (비우면 봇 이름 + 기본 단어)
+
+`kakao-rooms.json`의 방별 스위치: `ownerOnly`(주인 1:1), `pinned`, `ownerFix`, `wakeFilter`, `gate`(호출어 게이트 + 묶음 판정, 문서봇 방),
+`replyRefs`(답장용 `[rN]` 번호), `noJev`(분류기 호출 안 함), `maskPii`(분류기 전 개인정보 가림), `stripSelf`(분류기 전 봇 자기 말 제거).
 - [ ] `paths.genericCwds`: lane-reaper가 "프로젝트 폴더 아님"으로 볼 경로
 - [ ] `paths.memoryRepo`, `git.*`: git-sync를 켤 때만
 
-## 5. 데이터 파일 ($OMOCAT_HOME, 저장소에 올리지 않음)
+## 5. 데이터 파일 ($OMODORI_HOME, 저장소에 올리지 않음)
 
 | 파일 | 예시 | 내용 |
 |---|---|---|
@@ -77,17 +87,17 @@ $EDITOR ~/.omocat/config.json   # --apply 가 example 에서 만들어 준 뒤 �
 ## 6. 설치 후 확인
 
 ```sh
-launchctl list | grep "$(jq -r .launchd.prefix ~/.omocat/config.json)"
-tail -f ~/Library/Logs/dandori-supervisor/supervisor.log
-cd ~/.omocat && bun test
+launchctl list | grep "$(jq -r .launchd.prefix ~/.omodori/config.json)"
+tail -f ~/Library/Logs/omodori/supervisor/supervisor.log   # paths.logDir를 바꿨다면 그 아래 supervisor/
+cd ~/.omodori && bun test
 ```
 
 lead 세션(herdr 안의 omo)에서 `monitors.json`의 상시 모니터를 등록하고, `bun monitors-check.ts`가 `MONITOR_MISSING` 없이 끝나는지 본다.
-omo 확장 `dori-guard`를 쓰려면 `omo-extensions/dori-guard.shim.txt`의 경로를 새 `$OMOCAT_HOME`으로 바꿔 omo 확장 폴더에 넣는다.
+omo 확장 `dori-guard`를 쓰려면 `omo-extensions/dori-guard.shim.txt`의 경로를 새 `$OMODORI_HOME`으로 바꿔 omo 확장 폴더에 넣는다.
 
 ## 7. 이 이식판에 없는 것
 
-원래 Mac에서 쓰던 고객사·지인 전용 lane(특정 회사 문서·견적 도구, 게임 클랜 통계, 개인 알림, 메일·클라우드 감시 스크립트)과
-운영 기록(결정 로그, 설계 문서, 증거 파일, 브리프 원본)은 개인정보 때문에 뺐다. 필요하면 `kakao-lane-ext.ts`에 도구를 추가하고
+특정 설치에만 맞춘 lane 도구·프로필과 운영 기록(결정 로그, 설계 문서, 증거 파일, 브리프 원본)은 넣지 않았다.
+`lane-profiles/`에는 범용 `default`와 예시 봇 두 개(`kakao-chat` = 모모, `kakao-docs` = 루루)만 있다. 필요하면 `kakao-lane-ext.ts`에 도구를 추가하고
 `lane-profiles/`에 프로필을 만들어 붙인다.
 NAS·Tailscale 주소는 코드 어디에서도 쓰지 않아 설정 항목이 없다.

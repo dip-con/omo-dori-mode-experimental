@@ -32,7 +32,7 @@ export function checkPane(procs: Proc[], screen: string): PaneCheck {
   return { ok: true }
 }
 
-export const tagFor = (id: string) => `[dandori-msg:${id}]`
+export const tagFor = (id: string) => `[dori-msg:${id}]`
 export const tagMessage = (text: string, id: string) => `${text.replace(/\s+$/, '')}\n\n${tagFor(id)}`
 
 /** True when the session record holds a user message carrying the tag (receiver-side proof). */

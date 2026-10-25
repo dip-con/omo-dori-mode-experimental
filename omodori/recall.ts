@@ -1,17 +1,17 @@
 // "Search before saying I don't know" helper (dori-improve 7): one query over memory, session records and logs.
 //   bun recall.ts "<words>" [--days 7] [--max 8]     every word must appear (case-insensitive) in a hit
 // Sources: lead memory repo (md), OMO session records modified in the last --days (user/assistant text only),
-// ~/.omocat logs/docs/briefs/decisions/inbox and ~/Library/Logs/dandori-kakao. Secrets are masked in snippets.
+// ~/.omodori logs/docs/briefs/decisions/inbox and the kakao log folder (paths.logDir/kakao). Secrets are masked in snippets.
 // Last line: RECALL_SUMMARY memory=N sessions=N logs=N (all zero = it is really not on record).
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { redact } from './ledger'
-import { cfg } from './config'
+import { cfg, doriHome, kakaoLogs } from './config'
 
 const HOME = process.env.HOME!
 const MEMORY = cfg.paths.memoryRepo
 const SESSIONS = `${HOME}/.omo/agent/sessions`
-const LOG_PATHS = [`${HOME}/.omocat/logs`, `${HOME}/.omocat/docs`, `${HOME}/.omocat/briefs`, `${HOME}/.omocat/heartbeat`, `${HOME}/.omocat/decisions.jsonl`, `${HOME}/.omocat/inbox.jsonl`, `${HOME}/Library/Logs/dandori-kakao`]
+const LOG_PATHS = [`${doriHome()}/logs`, `${doriHome()}/docs`, `${doriHome()}/briefs`, `${doriHome()}/heartbeat`, `${doriHome()}/decisions.jsonl`, `${doriHome()}/inbox.jsonl`, `${kakaoLogs()}`]
 
 export function snippet(text: string, terms: string[], width = 110): string {
   const flat = text.replace(/\s+/g, ' ')

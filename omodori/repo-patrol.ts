@@ -6,6 +6,7 @@
 import { existsSync, statSync } from 'node:fs'
 import { type AddInput, add, load as loadDecisions } from './decisions-lib'
 import { CEO_THREAD, DORI, ageMin, flag, kst, opt, post, readJson, writeJson } from './dori-lib'
+import { cfg } from './config'
 
 type Cfg = { gitlabActiveDays: number; skipProjects: string[]; aliases: Record<string, string>; staleIssueDays: number; localRepos: string[]; uncommittedDays: number; oldWorktreeDays: number }
 type Item = { key: string; sig: string; prio: number; text: string; why: string; next: string }
@@ -125,7 +126,7 @@ async function localItems(): Promise<Item[]> {
 }
 
 const render = (items: Item[], added: string[], total: number) => [
-  `[저장소 순찰 ${kst().date}] 형이 볼 것 ${items.length}건${total > items.length ? ` (바뀐 것 ${total}건 중 우선 5)` : ''}`,
+  `[저장소 순찰 ${kst().date}] ${cfg.owner.title} 확인할 것 ${items.length}건${total > items.length ? ` (바뀐 것 ${total}건 중 우선 5)` : ''}`,
   ...items.map((it, n) => `${n + 1}. ${it.text}\n   왜: ${it.why} · 다음: ${it.next}`),
   ...(added.length ? [`결정 필요 ${added.length}건은 결정 인박스로 넣음(${added.join(', ')}) — 08:30/21:00 버튼으로 나감`] : []),
 ].join('\n')

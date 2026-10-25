@@ -1,4 +1,4 @@
-// Dandori RPC adapter (redesign S1, docs/dori-redesign/final.md §2.1).
+// Dori RPC adapter (redesign S1).
 // Lane key -> durable session id -> live control endpoint (routing id), then send / state / receipt / wait.
 //   resolve <target> [--json]                         durable id, sessionPath, routing {sessionId, socket, kind, instanceId}, managed
 //   protocol <target> [--json]                        get_protocol_info of the endpoint hosting the target
@@ -19,6 +19,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { deliver, isOmoProcess, recordHasTag, tagMessage, type Deps as HerdrDeps, type DeliverResult, type Proc } from './deliver'
 import { sessionDirSlug, sessionRoot } from './questions'
+import { doriHome, isLeadKey } from './config'
 
 const HOME = process.env.HOME!
 /** `customType` of the transcript entry an admitted delivery becomes (RT/core/extensions/session-control-types.js). */
@@ -51,7 +52,7 @@ export type RpcDeps = {
   requestTimeoutMs: number
   receiptWaitMs: number
   receiptPollMs: number
-  /** The supervisor snapshot (OMOCAT/lane-status.json); null when absent or unreadable. */
+  /** The supervisor snapshot (DORI_HOME/lane-status.json); null when absent or unreadable. */
   laneStatus?: () => any | null
   /** herdr agent_status of a pane ('working' | 'idle' | ...), null when herdr does not answer. Auxiliary only. */
   agentStatus?: (pane: string) => Promise<string | null>
@@ -59,7 +60,7 @@ export type RpcDeps = {
   statusStaleMs?: number
 }
 
-export const laneStatusPath = () => `${process.env.OMOCAT_HOME ?? `${HOME}/.omocat`}/lane-status.json`
+export const laneStatusPath = () => `${doriHome()}/lane-status.json`
 export function readLaneStatus(path = laneStatusPath()): any | null {
   try { return JSON.parse(readFileSync(path, 'utf8')) } catch { return null }
 }
@@ -227,7 +228,7 @@ export function createRpc(deps: RpcDeps) {
     const map = deps.loadMap()
     const entry = map[target] ?? Object.values(map).find((e) => e.sessionId === target)
     if (!entry && !/^[0-9a-f-]{8,}$/i.test(target)) throw new Error(`unknown target ${target}`)
-    const managed: Managed | null = entry ? (entry.key.startsWith('dandori-lead') ? 'lead' : entry.status === 'open' ? 'lane' : 'unmanaged') : null
+    const managed: Managed | null = entry ? (isLeadKey(entry.key) ? 'lead' : entry.status === 'open' ? 'lane' : 'unmanaged') : null
     return { map, entry, durableId: entry?.sessionId ?? target, managed }
   }
 
@@ -239,9 +240,9 @@ export function createRpc(deps: RpcDeps) {
     const routing = hit?.routing ?? null
     const sessionPath = hit?.row?.sessionPath ?? hit?.row?.session_file ?? findSessionFile(durableId, entry?.cwd ?? hit?.row?.cwd ?? null)
     let managed: Managed = 'unmanaged'
-    if (entry) managed = entry.key.startsWith('dandori-lead') ? 'lead' : entry.status === 'open' ? 'lane' : 'unmanaged'
+    if (entry) managed = isLeadKey(entry.key) ? 'lead' : entry.status === 'open' ? 'lane' : 'unmanaged'
     else {
-      const lanes = new Set(Object.values(map).filter((e) => e.status === 'open' && !e.key.startsWith('dandori-lead')).map((e) => e.sessionId))
+      const lanes = new Set(Object.values(map).filter((e) => e.status === 'open' && !isLeadKey(e.key)).map((e) => e.sessionId))
       if (parentOf(hit?.row, sessionPath).some((p) => lanes.has(p))) managed = 'child'
       else if (childOfLane(durableId, lanes)) managed = 'child'
     }
@@ -460,7 +461,7 @@ export function createRpc(deps: RpcDeps) {
   return { resolve, protocol, state, status, children, wait, answer, send, dispatch, receipt }
 }
 
-export const TRANSPORT_FILE = `${HOME}/.omocat/transport.json`
+export const TRANSPORT_FILE = `${doriHome()}/transport.json`
 export function transportFor(key: string, file = TRANSPORT_FILE): 'rpc' | 'herdr' {
   try {
     const t = JSON.parse(readFileSync(file, 'utf8'))
@@ -479,7 +480,7 @@ const herdrJson = async (args: string[]) => {
 export const liveRpcDeps: RpcDeps = {
   endpointsRoot: `${HOME}/.omo/agent/rpc-host-daemon`,
   sessionsRoot: sessionRoot(),
-  loadMap: () => (existsSync(`${HOME}/.omocat/sessions-map.json`) ? JSON.parse(readFileSync(`${HOME}/.omocat/sessions-map.json`, 'utf8')) : {}),
+  loadMap: () => (existsSync(`${doriHome()}/sessions-map.json`) ? JSON.parse(readFileSync(`${doriHome()}/sessions-map.json`, 'utf8')) : {}),
   paneProcs: async (pane) => (await herdrJson(['pane', 'process-info', '--pane', pane])).result.process_info.foreground_processes,
   probeTimeoutMs: 1500,
   requestTimeoutMs: 15_000,

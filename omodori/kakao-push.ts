@@ -1,43 +1,47 @@
-// KakaoTalk live.ndjson -> lane delivery (redesign S7, docs/dori-redesign/final.md §2.7). State lives in kakao-queue.sqlite
+// KakaoTalk live.ndjson -> lane delivery (redesign S7). State lives in kakao-queue.sqlite
 // (kakao-queue.ts): the cursor, every intake line, each room's pending/held/burst and every batch, so a restart resumes
 // where it stopped instead of at the end of the log.
-//   bun kakao-push.ts            run (launchd com.example.dori.kakao-push); single instance via OMOCAT/.locks/kakao-push.lock
+//   bun kakao-push.ts            run (launchd com.example.dori.kakao-push); single instance via DORI_HOME/.locks/kakao-push.lock
 //   bun kakao-push.ts --check    open the queue, report cursor/rooms/batches, take and release the lock, send nothing
 // Rules kept from before: QUIET 2.5 s / HOLD 8 s per room, wake-filter bursts 20/30/45 s, [호출][이어짐][문맥][rN] tags,
 // HELD_MAX 12 context lines, Jev fail-open. New:
 //   - a woken batch with more than 30 request lines is split into parts (own batch id each, header "[kakao-new 30개 (1/2)]");
 //     context lines go only into part 1 and are trimmed first, marked "[문맥 N줄 생략]"
 //   - one batch = one delivery id `kakao:<chat>:<seq>`; retries reuse it and look for its disk receipt first
-//   - workers per lane when OMOCAT/kakao-queue.json has {"workers":{"parallel":true}}; otherwise one global worker (as before)
+//   - workers per lane when DORI_HOME/kakao-queue.json has {"workers":{"parallel":true}}; otherwise one global worker (as before)
 //   - no sends to a lane under a lifecycle lease (lane-leases/<lane>/) or with registry seed.state 'pending', and none at all
-//     while OMOCAT/flags/kakao.pause-admission exists; intake and batching continue
-//   - the room a lane answers in: sa-cache/room.<lane> holds its chat id (kakao-lane-ext.ts reads it with OMOMEOW_LANE_KEY);
-//     the legacy sa-cache/jangdori-room is still written while workers are serial
+//     while DORI_HOME/flags/kakao.pause-admission exists; intake and batching continue
+//   - the room a lane answers in: sa-cache/room.<lane> holds its chat id (kakao-lane-ext.ts reads it with OMODORI_LANE_KEY);
+//     the legacy sa-cache/active-room is still written while workers are serial
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createSecretaryGate } from './kakao-secretary-gate'
 import { BURST, createWakeFilter, DECISION_LOG, waitsForMore, wakes } from './kakao-wake-filter'
-// 주인 10-22 acme-rag: [ACME] 테스트 방의 [문서검색] 자기 답변은 외부 분류기·레인 문맥에 넣지 않는다.
-import { isRagSelfAnswer } from './kakao-rag-guard' // local copy of rag/integration/kakao-push-rag-guard.ts (Dandori 10-22: no Data dependency)
+// 주인 10-22 [작업] 문서방 방의 [문서검색] 자기 답변은 외부 분류기·레인 문맥에 넣지 않는다.
+import { isRagSelfAnswer } from './kakao-rag-guard' // local copy of rag/integration/kakao-push-rag-guard.ts (lead 10-22: no Data dependency)
 import { replyQuoteLine } from './kakao-reply-quote'
 import { CrashError, type Batch, type BurstItem, type Crash, type HeldLine, type PLine, Queue, queuePath, type RoomState, type SentTo } from './kakao-queue'
 import { acquireDirLock, appendEvent, leaseActive, readMap } from './registry'
+import { doriHome, cfg, kakaoLogs, botForLane, callPattern } from './config'
 
 const HOME = process.env.HOME!
-const OMOCAT = process.env.OMOCAT_HOME ?? `${HOME}/.omocat`
-const LOG = process.env.KAKAO_LIVE_LOG ?? `${HOME}/Library/Logs/dandori-kakao/live.ndjson`
-export type Room = { name: string; lane: string; owner: string[]; ownerOnly?: boolean; pinned?: boolean; ownerFix?: boolean; note?: string; names?: Record<string, string>; wakeFilter?: boolean }
+const DORI_HOME = doriHome()
+const LOG = process.env.KAKAO_LIVE_LOG ?? `${kakaoLogs()}/live.ndjson`
+// gate: the room uses the call gate + burst triage (kakao-secretary-gate.ts); replyRefs: lines get [rN] refs for replies.
+export type Room = {
+  name: string; lane: string; owner: string[]; ownerOnly?: boolean; pinned?: boolean; ownerFix?: boolean; note?: string; names?: Record<string, string>; wakeFilter?: boolean
+  gate?: boolean; replyRefs?: boolean; noJev?: boolean; maskPii?: boolean; stripSelf?: boolean
+}
 export const ROOMS: Record<string, Room> = (() => {
-  try { return JSON.parse(readFileSync(`${HOME}/.omocat/kakao-rooms.json`, 'utf8')) } catch { return {} }
+  try { return JSON.parse(readFileSync(`${doriHome()}/kakao-rooms.json`, 'utf8')) } catch { return {} }
 })()
 const CHAT = /"chat_id"\s*:\s*(\d+)/
 const SENDER = /"sender_id"\s*:\s*(\d+)/
 const LOGID = /"log_id"\s*:\s*(\d+)/
 const MTYPE = /"message_type"\s*:\s*(\d+)/
-// 주인 10-14: 장도리 answers someone with KakaoTalk's reply (답장). Each line for the group lane gets a short ref [rN];
+// 주인 10-14: the bot answers someone with KakaoTalk's reply (답장). Each line in a replyRefs room gets a short ref [rN];
 // kakao_send(reply_to: "rN") looks it up here. Ids stay strings: log/user ids exceed 2^53.
-const REPLY_LANES = new Set(['kakao-family', 'kakao-friend'])
-const REPLY_REFS = process.env.REPLY_REFS_FILE ?? `${process.env.HOME}/.omocat/sa-cache/reply-refs.json`
+const REPLY_REFS = process.env.REPLY_REFS_FILE ?? `${doriHome()}/sa-cache/reply-refs.json`
 function mentionRef(chat: string, userId: string, nick: string) {
   let st: { next: number; refs: Record<string, unknown> }
   try { st = JSON.parse(readFileSync(REPLY_REFS, 'utf8')) } catch { st = { next: 1, refs: {} } }
@@ -55,12 +59,13 @@ function replyRef(chat: string, line: string, text: string) {
   writeFileSync(REPLY_REFS, JSON.stringify(st))
   return ref
 }
-const CALLED = /장도리|도리야/
+// A name call is one of the room bot's call words (config.json bots[].calls); a bot without calls is never name-called.
+const callOf = (room: Room) => callPattern(botForLane(room.lane))
 const nickCache = new Map<string, string>()
 
 // Fallback when kakao-loco.ts could not name the sender: nicknames exported from the old PC app DB.
 const savedNicks: Record<string, string> = (() => {
-  try { return JSON.parse(readFileSync(`${process.env.HOME}/.omocat/sa-cache/kakao-nicks.json`, 'utf8')) } catch { return {} }
+  try { return JSON.parse(readFileSync(`${doriHome()}/sa-cache/kakao-nicks.json`, 'utf8')) } catch { return {} }
 })()
 async function nickOf(id: string) {
   return nickCache.get(id) ?? savedNicks[id] ?? '?'
@@ -68,13 +73,14 @@ async function nickOf(id: string) {
 
 // Which lane gets a live.ndjson line, as what text; null = not delivered. Only the owner's own account may reach an
 // ownerOnly room's lane (the unrestricted one): anything else there is dropped, not forwarded.
-// A follow-up from someone who just called 장도리 has no 장도리/도리야 in it, so the lane used to read it as people
+// A follow-up from someone who just called the bot has no call word in it, so the lane used to read it as people
 // talking among themselves and stay silent (10-11). A sender who called (or continued) within CONVO_MS is still
-// talking to 장도리: tag it [이어짐] and extend the window. (장도리's own text sends are not echoed into live.ndjson,
-// so "did 장도리 answer" cannot be part of the rule.)
+// talking to the bot: tag it [이어짐] and extend the window. (The bot's own text sends are not echoed into live.ndjson,
+// so "did the bot answer" cannot be part of the rule.)
 const CONVO_MS = 5 * 60_000
 const engaged = new Map<string, number>()
-const secretaryGate = createSecretaryGate()
+const gates = new Map<string, ReturnType<typeof createSecretaryGate>>()
+const gateOf = (room: Room) => { let g = gates.get(room.lane); if (!g) gates.set(room.lane, (g = createSecretaryGate(botForLane(room.lane)))); return g }
 const wakeFilter = createWakeFilter({ nicks: savedNicks })
 type Filter = typeof wakeFilter
 type Seen = ReturnType<Filter['observe']>
@@ -88,7 +94,7 @@ type Routed = {
   burst?: { who: string; text: string; gate: 'called' | 'continued' | null; seen: NonNullable<Seen> }
 }
 
-// [ACME] 테스트: one Jev judgment for one author's burst. [호출] = called directly; [요청판단] = not called but judged to
+// [작업] 문서방: one Jev judgment for one author's burst. [호출] = called directly; [요청판단] = not called but judged to
 // need an answer (work request, follow-up to work the secretary holds, question to it); [문맥] = kept only as context;
 // discarded lines go nowhere. [후속후보] only appears when Jev failed and the old gate decided.
 export async function judgeBurst(items: Routed[], filter = wakeFilter): Promise<Routed[]> {
@@ -114,18 +120,18 @@ export async function route(line: string, seen?: Seen, filter = wakeFilter, room
   const isOwner = room.owner.includes(sender)
   if (room.ownerOnly && !isOwner) return null
   if (room.ownerFix && isOwner) recordOwnerFix(at, String(m.text ?? ''))
-  // Join/leave feeds (message_type 0, text = feed JSON). 주인 10-14: 장도리 greeted 깐봉 when someone only said they
-  // recruited him; greet on the real join instead. feedType 1 invite / 4 open-chat join -> [입장], 2 leave / 6 kick -> [퇴장];
+  // Join/leave feeds (message_type 0, text = feed JSON). 주인 10-14: the bot greeted a member when someone only said they
+  // recruited them; greet on the real join instead. feedType 1 invite / 4 open-chat join -> [입장], 2 leave / 6 kick -> [퇴장];
   // other feeds (blind, etc.) are dropped.
   if (Number(line.match(MTYPE)?.[1]) === 0) {
-    if (room.lane === 'kakao-acme-docs') return null
+    if (room.gate) return null
     let f: { feedType?: number; members?: { nickName?: string }[] } = {}
     try { f = JSON.parse(String(m.text ?? '')) } catch {}
     const names = (f.members ?? []).map((x) => x.nickName).filter(Boolean).join(', ')
     const kind = f.feedType === 1 || f.feedType === 4 ? '입장' : f.feedType === 2 || f.feedType === 6 ? '퇴장' : ''
     if (!kind || !names) return null
     // 주인 10-14: greet a newcomer with a mention. Store each joiner (user id from the raw line, it exceeds 2^53) as a ref.
-    if (kind === '입장' && REPLY_LANES.has(room.lane)) {
+    if (kind === '입장' && room.replyRefs) {
       const ids = [...String(line).matchAll(/\\?"userId\\?"\s*:\s*(\d+)/g)].map((x) => x[1]!)
       const refs = (f.members ?? []).map((x, i) => ids[i] && x.nickName ? `[${mentionRef(chat, ids[i]!, x.nickName)}] ${x.nickName}` : x.nickName).join(', ')
       return { chat, room, sender, isOwner: false, text: `[입장] ${refs}` }
@@ -135,30 +141,30 @@ export async function route(line: string, seen?: Seen, filter = wakeFilter, room
   const who = isOwner ? '주인님(주인)' : room.names?.[sender] ?? m.sender ?? (await nickOf(sender))
   const text = String(m.text ?? '')
   const key = `${chat}:${sender}`
-  // Dandori 10-23: a reply ("이거 PDF로") carries the message it answers as one extra line.
+  // lead 10-23: a reply ("이거 PDF로") carries the message it answers as one extra line.
   const quote = await replyQuoteLine(m, chat, line.match(LOGID)?.[1] ?? '', (id) => room.names?.[id] ?? savedNicks[id] ?? nickCache.get(id) ?? null)
     .then((q) => (q ? `\n${q}` : ''), () => '')
-  if (room.lane === 'kakao-acme-docs') {
-    const decision = secretaryGate({ ...m, chat, sender, text, at })
+  if (room.gate) {
+    const decision = gateOf(room)({ ...m, chat, sender, text, at })
     // 주인 10-21: with the filter on, the line waits in its author's burst and judgeBurst decides the whole burst.
     if (room.wakeFilter && seen) return { chat, room, sender, isOwner, text: '', burst: { who, text: text + quote, gate: decision, seen } }
     if (!decision) return null
     const tag = decision === 'called' ? '[호출]' : '[후속후보]'
     return { chat, room, sender, isOwner, text: `${tag} ${who}: ${text}${quote}` }
   }
-  const called = CALLED.test(text)
+  const called = callOf(room)?.test(text) ?? false
   const since = engaged.get(key)
   const continued = !called && since !== undefined && at - since >= 0 && at - since <= CONVO_MS
   if (called || continued) engaged.set(key, at)
   const tag = called ? '[호출] ' : continued ? '[이어짐] ' : ''
-  const ref = REPLY_LANES.has(room.lane) && line.match(LOGID) ? `[${replyRef(chat, line, text)}] ` : ''
+  const ref = room.replyRefs && line.match(LOGID) ? `[${replyRef(chat, line, text)}] ` : ''
   return { chat, room, sender, isOwner, text: `${ref}${tag}${who}: ${text}${quote}` }
 }
 
-// 주인 may ask the restricted group lane to change 장도리 itself (brief, tool bugs) in an ownerFix room (10-12). The
-// lane cannot do that work; its jangdori_fix_request tool forwards to the lead, and it forwards these recorded owner
+// 주인 may ask the restricted group lane to change the bot itself (brief, tool bugs) in an ownerFix room (10-12). The
+// lane cannot do that work; its bot_fix_request tool forwards to the lead, and it forwards these recorded owner
 // texts verbatim, never the model's own wording, so only messages from the owner's account can ever reach the lead.
-export const OWNER_FIX_FILE = process.env.OWNER_FIX_FILE ?? `${process.env.HOME}/.omocat/sa-cache/owner-fix-requests.json`
+export const OWNER_FIX_FILE = process.env.OWNER_FIX_FILE ?? `${doriHome()}/sa-cache/owner-fix-requests.json`
 function recordOwnerFix(at: number, text: string) {
   let list: { at: number; text: string; forwarded?: boolean }[] = []
   try { list = JSON.parse(readFileSync(OWNER_FIX_FILE, 'utf8')) } catch {}
@@ -166,7 +172,7 @@ function recordOwnerFix(at: number, text: string) {
   writeFileSync(OWNER_FIX_FILE, JSON.stringify(list.slice(-20)))
 }
 
-const PEOPLE = `${process.env.HOME}/.omocat/sa-cache/kakao-people.json`
+const PEOPLE = `${doriHome()}/sa-cache/kakao-people.json`
 function peopleNotes(senders: Set<string>) {
   let notes: Record<string, { name: string; note: string }> = {}
   try { notes = JSON.parse(readFileSync(PEOPLE, 'utf8')) } catch { return '' }
@@ -386,7 +392,7 @@ export function createPush(cfg: PushCfg) {
       mkdirSync(sacache, { recursive: true })
       writeAtomic(join(sacache, `room.${b.lane}`), b.chat_id)
       // A pinned room's lane sends via its own extension; writing the legacy file would redirect the shared group lane.
-      if (!parallel && room && !room.ownerOnly && !room.pinned) writeAtomic(join(sacache, 'jangdori-room'), room.name)
+      if (!parallel && room && !room.ownerOnly && !room.pinned) writeAtomic(join(sacache, 'active-room'), room.name)
     } catch (e) { out(`room file write failed ${(e as Error)?.message}`) }
   }
 
@@ -499,18 +505,18 @@ async function liveSender(home: string): Promise<Sender> {
 
 if (import.meta.main) {
   const check = process.argv.includes('--check')
-  mkdirSync(join(OMOCAT, '.locks'), { recursive: true })
+  mkdirSync(join(DORI_HOME, '.locks'), { recursive: true })
   let lock: { release: () => void }
-  try { lock = await acquireDirLock(join(OMOCAT, '.locks', 'kakao-push.lock'), { waitMs: 0 }) } catch (e) {
+  try { lock = await acquireDirLock(join(DORI_HOME, '.locks', 'kakao-push.lock'), { waitMs: 0 }) } catch (e) {
     console.error(new Date().toISOString(), 'kakao-push: another instance holds the lock, exiting', (e as Error)?.message)
     process.exit(check ? 1 : 0)
   }
   const release = () => { try { lock.release() } catch {} }
   process.once('exit', release)
   for (const sig of ['SIGTERM', 'SIGINT'] as const) process.once(sig, () => { release(); process.exit(0) })
-  const q = Queue.open(queuePath(OMOCAT))
-  const push = createPush({ home: OMOCAT, log: LOG, rooms: ROOMS, queue: q, sender: await liveSender(OMOCAT) })
-  const summary = { db: q.path, cursor: q.cursor(), log: LOG, logExists: existsSync(LOG), rooms: Object.keys(ROOMS).length, parallel: parallelWorkers(OMOCAT), batches: q.counts(), restoredRooms: push.rooms.size }
+  const q = Queue.open(queuePath(DORI_HOME))
+  const push = createPush({ home: DORI_HOME, log: LOG, rooms: ROOMS, queue: q, sender: await liveSender(DORI_HOME) })
+  const summary = { db: q.path, cursor: q.cursor(), log: LOG, logExists: existsSync(LOG), rooms: Object.keys(ROOMS).length, parallel: parallelWorkers(DORI_HOME), batches: q.counts(), restoredRooms: push.rooms.size }
   if (check) {
     console.log(JSON.stringify({ ok: true, check: true, ...summary }))
     q.close(); release(); process.exit(0)

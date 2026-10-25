@@ -1,4 +1,4 @@
-// TypeScript port of acme_rag.policy.screen_text plus a sanitizer for the
+// TypeScript port of the RAG policy screen_text plus a sanitizer for the
 // external wake-classifier state.  Detection runs on a normalized copy that is
 // never returned; results carry only a fixed reason code.  An allowed result
 // does not prove that personal or financial data is absent.

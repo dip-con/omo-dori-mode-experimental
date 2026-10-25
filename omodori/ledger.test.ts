@@ -1,5 +1,5 @@
 // Regression tests for the ledger lost-update race (2026-10-23): CLI "promise done" between a sweep's read and its
-// write must survive. Every run uses a temp HOME/OMOCAT_HOME and a fake fetch (preload): no network, no real ledger.
+// write must survive. Every run uses a temp HOME/OMODORI_HOME and a fake fetch (preload): no network, no real ledger.
 // LEDGER_TS=<path> runs the same tests against another copy (used to show the pre-fix failure).
 import { afterAll, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const LEDGER_TS = process.env.LEDGER_TS ?? join(import.meta.dir, 'ledger.ts')
-const ROOT = mkdtempSync(join(tmpdir(), 'omocat-ledger-'))
+const ROOT = mkdtempSync(join(tmpdir(), 'omodori-ledger-'))
 afterAll(() => rmSync(ROOT, { recursive: true, force: true }))
 const H = 3600_000
 const GENERAL = '1000000000000000001'
@@ -16,13 +16,13 @@ let n = 0
 
 function setup(promises: object[]) {
   const home = join(ROOT, `h${++n}`)
-  const omocat = join(home, '.omocat')
+  const omodori = join(home, '.omodori')
   mkdirSync(join(home, '.config', 'agent-messenger'), { recursive: true })
-  mkdirSync(omocat, { recursive: true })
-  writeFileSync(join(home, '.config', 'agent-messenger', 'discordbot-credentials.json'), JSON.stringify({ bots: { omocat: { token: 'fake' } } }))
-  const ledger = join(omocat, 'ledger.json')
+  mkdirSync(omodori, { recursive: true })
+  writeFileSync(join(home, '.config', 'agent-messenger', 'discordbot-credentials.json'), JSON.stringify({ bots: { assistant: { token: 'fake' } } }))
+  const ledger = join(omodori, 'ledger.json')
   writeFileSync(ledger, JSON.stringify({ since: Date.now() - H, cursors: {}, promises, requests: [] }))
-  const env: Record<string, string | undefined> = { ...process.env, HOME: home, OMOCAT_HOME: omocat }
+  const env: Record<string, string | undefined> = { ...process.env, HOME: home, OMODORI_HOME: omodori }
   delete env.DORI_LEDGER
   return { home, ledger, env, read: () => JSON.parse(readFileSync(ledger, 'utf8')) }
 }

@@ -160,13 +160,13 @@ test('kakao-stall: an open batch older than the limit is a push stall', () => {
   q.close()
 })
 
-test('(h) kakao-lane-ext room(): OMOMEOW_LANE_KEY + sa-cache/room.<lane> -> that chat; unset -> legacy file; JANGDORI_ROOM still wins', () => {
+test('(h) kakao-lane-ext room(): OMODORI_LANE_KEY + sa-cache/room.<lane> -> that chat; unset -> legacy file; OMODORI_ROOM still wins', () => {
   const d = tmp()
   const rooms = JSON.parse(readFileSync(join(FX, 'rooms.json'), 'utf8'))
   writeFileSync(join(d, 'room.kakao-fx-a'), '18000000000000001\n')
-  writeFileSync(join(d, 'jangdori-room'), '[FX] 둘째방')
-  expect(roomName({ OMOMEOW_LANE_KEY: 'kakao-fx-a' }, d, rooms)).toBe('[FX] 큰방')
+  writeFileSync(join(d, 'active-room'), '[FX] 둘째방')
+  expect(roomName({ OMODORI_LANE_KEY: 'kakao-fx-a' }, d, rooms)).toBe('[FX] 큰방')
   expect(roomName({}, d, rooms)).toBe('[FX] 둘째방')
-  expect(roomName({ OMOMEOW_LANE_KEY: 'kakao-fx-b' }, d, rooms)).toBe('[FX] 둘째방')
-  expect(roomName({ OMOMEOW_LANE_KEY: 'kakao-fx-a', JANGDORI_ROOM: '[FX] 핀방' }, d, rooms)).toBe('[FX] 핀방')
+  expect(roomName({ OMODORI_LANE_KEY: 'kakao-fx-b' }, d, rooms)).toBe('[FX] 둘째방')
+  expect(roomName({ OMODORI_LANE_KEY: 'kakao-fx-a', OMODORI_ROOM: '[FX] 핀방' }, d, rooms)).toBe('[FX] 핀방')
 })

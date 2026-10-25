@@ -26,7 +26,7 @@
 
 
  그다음 "B" 라고만 답해.
- [dandori-msg:tfbfe2c44]
+ [dori-msg:tfbfe2c44]
 
 
  B
@@ -36,5 +36,5 @@
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ❯
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-/private/tmp/omocat-deliver-test • Reply OK Only • … • 29K/922K (3.2%) (auto)      (chatgpt-subscription) ⚡ gpt-6-luna:low
+/private/tmp/omodori-deliver-test • Reply OK Only • … • 29K/922K (3.2%) (auto)      (chatgpt-subscription) ⚡ gpt-6-luna:low
 (😺 OmO Native by Q Kim) Claude 93/29% CC 94/78% GPT 100% Grok 100%

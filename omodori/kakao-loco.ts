@@ -1,16 +1,18 @@
 import { Long } from 'bson'
-// 장도리 live stream over KakaoTalk's own protocol (agent-messenger, tablet sub-device of the 단도리 account).
+// Live stream over KakaoTalk's own protocol (agent-messenger, tablet sub-device of the bot's account).
 // LaunchAgent com.example.dori.kakao-live runs it with stdout -> live.ndjson, one line per message.
 import { statSync, readFileSync } from 'node:fs'
 import { addressingFields } from './kakao-secretary-gate'
 import { boundedResponse, startLocoWatchdog, TroubleWindow } from './kakao-loco-guard'
 import { AUTH_RETRY_MS, ReloginRequired, connectWithRefresh, keepTokenFresh, reportReloginRequired } from './kakao-token'
 import { KakaoTalkClient, KakaoTalkListener } from 'agent-messenger/kakaotalk'
-import { cfg, omocatHome } from './config'
+import { cfg, doriHome, kakaoLogs, botForLane } from './config'
 
 const ME = cfg.kakao.botUserId
-const ROOMS = Object.keys(JSON.parse(readFileSync(`${omocatHome()}/kakao-rooms.json`, 'utf8')))
-const LOG = `${process.env.HOME}/Library/Logs/dandori-kakao/live.ndjson`
+// One KakaoTalk account serves every room, so its own lines carry the first bot's name (config.json bots[0]).
+const SELF = botForLane('').name
+const ROOMS = Object.keys(JSON.parse(readFileSync(`${doriHome()}/kakao-rooms.json`, 'utf8')))
+const LOG = `${kakaoLogs()}/live.ndjson`
 
 // Kakao ids exceed 2^53: keep them as decimal strings and write them as bare JSON numbers.
 const idOf = (v: unknown): string => {
@@ -22,7 +24,7 @@ const idOf = (v: unknown): string => {
 }
 
 // Photo URLs for the agents. type 2 = one photo (attachment.url); type 27 = a multi-photo message ("사진 2장"), whose
-// URLs are in attachment.imageUrls (thumbnailUrls as fallback). Missing 27 made 장도리 see only older photos (10-13).
+// URLs are in attachment.imageUrls (thumbnailUrls as fallback). Missing 27 made the bot see only older photos (10-13).
 function photoFields(type: number, a: Record<string, unknown> | null | undefined) {
   if (type === 2 && typeof a?.url === 'string') return { photo_url: a.url }
   if (type === 27) {
@@ -42,13 +44,13 @@ function emit(m: { chat_id: unknown; log_id: unknown; author_id: unknown; author
     chat_id: '__CHAT__', is_from_me: sender === ME, log_id: '__LOG__', message_type: m.message_type,
     ...photoFields(m.message_type, m.attachment),
     ...addressingFields(m.attachment, idOf),
-    ...(name ? { sender: name } : sender === ME ? { sender: '장도리' } : {}),
+    ...(name ? { sender: name } : sender === ME ? { sender: SELF } : {}),
     sender_id: '__SENDER__', text: m.message ?? '', timestamp: new Date(m.sent_at * 1000).toISOString().replace('.000', ''), type: 'message',
   }).replace('"__CHAT__"', idOf(m.chat_id)).replace('"__LOG__"', idOf(m.log_id)).replace('"__SENDER__"', sender)
   process.stdout.write(line + '\n')
 }
 
-const ROOMS_FILE = `${omocatHome()}/kakao-rooms.json`
+const ROOMS_FILE = `${doriHome()}/kakao-rooms.json`
 let roomsCache = { mtime: 0, ids: ROOMS }
 function liveRooms() {
   try {
@@ -75,7 +77,7 @@ const die = (why: string) => { console.error(new Date().toISOString(), 'exit:', 
 // 10-25: probe failures that alternate with successes plus slow /messages timeouts never tripped the 2-in-a-row rule.
 const trouble = new TroubleWindow({ windowMs: 30 * 60_000, maxInWindow: 3 }, die)
 listener.on('message', (ev) => {
-  // Re-read the rooms file on change: a room added after start (친구B방 10-14) was silently dropped until a restart.
+  // Re-read the rooms file on change: a room added after start (10-14) was silently dropped until a restart.
   if (!liveRooms().includes(idOf(ev.chat_id))) return
   emit(ev, ev.author_name ?? client.lookupAuthorName(idOf(ev.chat_id), Number(idOf(ev.author_id))))
 })
@@ -94,7 +96,7 @@ startLocoWatchdog(async () => {
 
 // Kakao allows one session per device, so a second login (e.g. the agent-kakaotalk CLI) kicks this one:
 // the lane sends and reads through this process instead, on loopback only.
-const nameOf = (chat: string, sender: string) => (sender === ME ? '장도리' : client.lookupAuthorName(chat, Number(sender)))
+const nameOf = (chat: string, sender: string) => (sender === ME ? SELF : client.lookupAuthorName(chat, Number(sender)))
 
 // 답장 (주인 10-14). agent-messenger's sendMessage({replyTo}) builds the extra without the open-chat link id and with JS
 // numbers, so open-chat replies came back with logId 0 and never showed. Build the extra here: ids as raw JSON numbers

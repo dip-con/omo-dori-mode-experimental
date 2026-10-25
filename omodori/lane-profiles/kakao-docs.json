@@ -1,0 +1,15 @@
+{
+ "//": "Example profile for the document bot (루루 in examples/config.example.json): KakaoTalk tools including files, web search, working folder under the data folder.",
+ "label": "kakao-docs",
+ "cwd": "{home}/docs-work",
+ "thread": null,
+ "ext": [
+  "{install}/kakao-lane-ext.ts"
+ ],
+ "tools": "kakao_send,kakao_recent,kakao_send_file,kakao_receive_file,kakao_send_image,kakao_view_photo,web_search",
+ "model": "anthropic-subscription/claude-opus-5-5",
+ "thinking": "medium",
+ "noClaim": true,
+ "briefPath": "{home}/briefs/kakao-docs.md",
+ "checkpointOnReset": false
+}

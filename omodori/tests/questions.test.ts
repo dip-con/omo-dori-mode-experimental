@@ -129,7 +129,7 @@ test('real OMO question screens are detected and parsed', () => {
 })
 
 test('false positive: a pane that only SHOWS the question-UI strings is not asking', () => {
-  // OmOMeow reported herdr-watch firing on a pane whose screen showed questions.ts source code.
+  // The lead reported herdr-watch firing on a pane whose screen showed questions.ts source code.
   expect(questionUiAtBottom(fx('code-on-screen.txt'))).toBe(false)
   expect(parseOmoScreen(fx('code-on-screen.txt'))).toBeNull()
   // The real UI copied higher up a scrolled screen (not at the bottom) is not asking either.
@@ -139,7 +139,7 @@ test('false positive: a pane that only SHOWS the question-UI strings is not aski
 
 test('session dir slug resolves /tmp to /private/tmp and the agent dir env wins', () => {
   expect(sessionDirSlug('/tmp')).toBe('--private-tmp--')
-  expect(sessionDirSlug('/Users/owner/.omocat')).toBe('--Users-owner-.omocat--')
+  expect(sessionDirSlug('/Users/owner/.omodori')).toBe('--Users-owner-.omodori--')
   expect(sessionRoot({ OMO_CODING_AGENT_DIR: '/x/agent', HOME: '/h' })).toBe('/x/agent/sessions')
   expect(sessionRoot({ HOME: '/h' })).toBe('/h/.omo/agent/sessions')
 })

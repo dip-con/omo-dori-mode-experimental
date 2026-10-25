@@ -1,4 +1,4 @@
-// Inputs of the Dandori supervisor (redesign S4, docs/dori-redesign/final.md §2.3/§2.5).
+// Inputs of the dori supervisor (redesign S4).
 // Read-only sources: the endpoint registry (rpc-host-daemon/*/endpoint.json), `omo host status`, herdr-dag run files,
 // and the herdr pane list (pane presence only, never screen reads). Plus the one live link type the supervisor holds
 // per reachable endpoint: a socket that sends observe-only requests and receives session_status / feed records.
@@ -13,7 +13,7 @@ export const AGENT_DIR = `${HOME}/.omo/agent`
 export type EndpointKind = 'tui' | 'rpc_host'
 export type Endpoint = { kind: EndpointKind; socket: string }
 
-/** The subscription every endpoint gets (final.md §2.3 input 2; review 10: workers must be asked for). */
+/** The subscription every endpoint gets (review 10: workers must be asked for). */
 export const SUBSCRIBE_SESSIONS = Object.freeze({
   type: 'subscribe_sessions', sessions: 'all', include_workers: true, include_context: true, effects: true,
 })

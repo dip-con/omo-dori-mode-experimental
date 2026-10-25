@@ -1,15 +1,17 @@
 #!/bin/bash
-# 장도리 health check (LaunchAgent com.example.dori.kakao-health, every 60 s).
+# KakaoTalk bot health check (LaunchAgent com.example.dori.kakao-health, every 60 s).
 # Tells the lead only when the state changes: a stall in kakao-loco (live stream) / kakao-push, then recovery.
-# redesign S9: the lead is told through the event router (a kakao.* event appended to ~/.omocat/events/supervisor.ndjson:
+# redesign S9: the lead is told through the event router (a kakao.* event appended to ~/.omodori/events/supervisor.ndjson:
 # kakao.health_problem = DORI_ASK, kakao.recovered = digest), never by typing into the lead pane.
 export PATH=$HOME/.local/bin:$HOME/.bun/bin:$HOME/.local/node-current/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
-CFG=${DORI_PORTABLE_CONFIG:-${OMOCAT_HOME:-$HOME/.omocat}/config.json}
+CFG=${DORI_PORTABLE_CONFIG:-${OMODORI_HOME:-$HOME/.omodori}/config.json}
 PREFIX=$(jq -r '.launchd.prefix // "com.example.dori"' "$CFG" 2>/dev/null || echo com.example.dori)
 PORT=$(jq -r '.kakao.locoPort // 8397' "$CFG" 2>/dev/null || echo 8397)
 export CHAT=$(jq -r '.kakao.healthChatId // ""' "$CFG" 2>/dev/null)
 [ -n "$CHAT" ] || { echo "$(date) kakao.healthChatId not set in $CFG, skipping"; exit 0; }
-L=$HOME/Library/Logs/dandori-kakao
+LOGDIR=$(jq -r '.paths.logDir // empty' "$CFG" 2>/dev/null); LOGDIR=${LOGDIR:-$HOME/Library/Logs/omodori}; LOGDIR=${LOGDIR/#\~/$HOME}
+L=${OMODORI_KAKAO_LOGS:-$LOGDIR/kakao}
+DATA=$(jq -r '.paths.dataDir // empty' "$CFG" 2>/dev/null); DATA=${OMODORI_HOME:-${DATA:-$HOME/.omodori}}; DATA=${DATA/#\~/$HOME}
 STATE=$L/health.state
 now=$(date +%s)
 problem=""
@@ -96,7 +98,7 @@ except Exception:
     launchctl kickstart -k "gui/$(id -u)/$PREFIX.kakao-live"
   fi
 fi
-EVENTS=${OMOCAT_HOME:-$HOME/.omocat}/events/supervisor.ndjson
+EVENTS=$DATA/events/supervisor.ndjson
 emit() { # kind severity text
   mkdir -p "$(dirname "$EVENTS")"
   jq -nc --arg kind "$1" --arg sev "$2" --arg text "$3" --arg at "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" --arg id "$1:$now" \

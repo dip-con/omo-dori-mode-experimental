@@ -11,14 +11,14 @@ const sayCall = (ts: string, cmd: string) => JSON.stringify({ type: 'message', t
 test('a kakao "started" message in a session that then hit a quota error is reported as stopped and started-only', () => {
   const text = [
     JSON.stringify({ type: 'session', id: 'aaaa', timestamp: '2026-10-22T12:00:00Z' }),
-    sayCall('2026-10-22T12:13:41Z', 'await tool.bash({command: `bun ~/.omocat/kakao-say.ts acme \\"건설정보 자동 수집이랑 관리자 수동 수집 버튼 작업 시작했어\\"`})'),
+    sayCall('2026-10-22T12:13:41Z', 'await tool.bash({command: `bun ~/.omodori/kakao-say.ts app \\"자동 수집이랑 관리자 수동 수집 버튼 작업 시작했어\\"`})'),
     asst('2026-10-22T15:16:25Z', { stopReason: 'error', errorMessage: 'No credential slots available' }),
   ].join('\n')
   const s = parseSession('/x/2026_aaaa.jsonl', text, range)
   expect(s.says).toHaveLength(1)
-  expect(s.says[0]).toMatchObject({ room: 'acme', text: '건설정보 자동 수집이랑 관리자 수동 수집 버튼 작업 시작했어' })
-  const r = build({ date: '2026-10-22', now: kst('2026-10-23T08:00:00'), ledger: empty, inbox: [], bot: [], sessions: [s], laneKeys: { aaaa: 'kakao-acme-chat' } })
-  expect(r.stopped[0]).toMatchObject({ lane: 'kakao-acme-chat' })
+  expect(s.says[0]).toMatchObject({ room: 'app', text: '자동 수집이랑 관리자 수동 수집 버튼 작업 시작했어' })
+  const r = build({ date: '2026-10-22', now: kst('2026-10-23T08:00:00'), ledger: empty, inbox: [], bot: [], sessions: [s], laneKeys: { aaaa: 'kakao-work' } })
+  expect(r.stopped[0]).toMatchObject({ lane: 'kakao-work' })
   expect(r.stopped[0]!.detail).toContain('No credential slots available')
   expect(r.started).toHaveLength(1)
   expect(openCount(r)).toBe(2)
@@ -26,19 +26,19 @@ test('a kakao "started" message in a session that then hit a quota error is repo
 
 test('a later completion message in the same room clears the started item', () => {
   const bot = [
-    { src: 'kakao' as const, room: 'acme', at: kst('2026-10-22T10:00:00'), text: '작업 시작했어' },
-    { src: 'kakao' as const, room: 'acme', at: kst('2026-10-22T11:00:00'), text: '작업 완료했어' },
+    { src: 'kakao' as const, room: 'app', at: kst('2026-10-22T10:00:00'), text: '작업 시작했어' },
+    { src: 'kakao' as const, room: 'app', at: kst('2026-10-22T11:00:00'), text: '작업 완료했어' },
   ]
   expect(build({ date: '2026-10-22', now: Date.now(), ledger: empty, inbox: [], bot, sessions: [] }).started).toHaveLength(0)
 })
 
 test('a start message containing 머지/배포 nouns is not a completion and does not clear an earlier start', () => {
-  expect(isCompletion('건설정보 머지 배포 작업 시작했어')).toBe(false)
-  expect(isStartOnly('건설정보 머지 배포 작업 시작했어')).toBe(true)
+  expect(isCompletion('머지 배포 작업 시작했어')).toBe(false)
+  expect(isStartOnly('머지 배포 작업 시작했어')).toBe(true)
   expect(isCompletion('머지했어')).toBe(true)
   const bot = [
-    { src: 'kakao' as const, room: 'acme', at: kst('2026-10-22T10:00:00'), text: '건설정보 자동 수집 작업 시작했어' },
-    { src: 'kakao' as const, room: 'acme', at: kst('2026-10-22T11:00:00'), text: '건설정보 머지 배포 작업 시작했어' },
+    { src: 'kakao' as const, room: 'app', at: kst('2026-10-22T10:00:00'), text: '자동 수집 작업 시작했어' },
+    { src: 'kakao' as const, room: 'app', at: kst('2026-10-22T11:00:00'), text: '머지 배포 작업 시작했어' },
   ]
   const r = build({ date: '2026-10-22', now: kst('2026-10-23T08:00:00'), ledger: empty, inbox: [], bot, sessions: [] })
   expect(r.started.map((m) => m.text)).toEqual(bot.map((m) => m.text))
@@ -46,11 +46,11 @@ test('a start message containing 머지/배포 nouns is not a completion and doe
 
 test('a completion after the review cutoff (end of day, or --now if earlier) does not clear a started item', () => {
   const bot = [
-    { src: 'kakao' as const, room: 'acme', at: kst('2026-10-22T10:00:00'), text: '작업 시작했어' },
-    { src: 'kakao' as const, room: 'acme', at: kst('2026-10-23T09:00:00'), text: '작업 완료했어' },
+    { src: 'kakao' as const, room: 'app', at: kst('2026-10-22T10:00:00'), text: '작업 시작했어' },
+    { src: 'kakao' as const, room: 'app', at: kst('2026-10-23T09:00:00'), text: '작업 완료했어' },
   ]
   expect(build({ date: '2026-10-22', now: kst('2026-10-24T00:00:00'), ledger: empty, inbox: [], bot, sessions: [] }).started).toHaveLength(1)
-  const same = [bot[0]!, { src: 'kakao' as const, room: 'acme', at: kst('2026-10-22T20:00:00'), text: '작업 완료했어' }]
+  const same = [bot[0]!, { src: 'kakao' as const, room: 'app', at: kst('2026-10-22T20:00:00'), text: '작업 완료했어' }]
   expect(build({ date: '2026-10-22', now: kst('2026-10-22T15:00:00'), ledger: empty, inbox: [], bot: same, sessions: [] }).started).toHaveLength(1)
   expect(build({ date: '2026-10-22', now: kst('2026-10-23T00:00:00'), ledger: empty, inbox: [], bot: same, sessions: [] }).started).toHaveLength(0)
 })

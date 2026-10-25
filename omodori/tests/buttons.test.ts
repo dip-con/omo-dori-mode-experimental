@@ -19,7 +19,7 @@ let onKeys: (k: string[]) => void
 let deps: Deps
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'omocat-buttons-test-'))
+  dir = mkdtempSync(join(tmpdir(), 'omodori-buttons-test-'))
   calls = []; keys = []; texts = []; events = []; screen = IDLE_SCREEN; onKeys = () => {}
   let next = 100
   deps = {
@@ -46,7 +46,7 @@ const press = (customId: string, user = OWNER_ID, message = '100'): Interaction 
 
 function sessionLog(questions: unknown[]) {
   const root = join(dir, 'sessions')
-  const cwd = mkdtempSync(join(tmpdir(), 'omocat-pane-'))
+  const cwd = mkdtempSync(join(tmpdir(), 'omodori-pane-'))
   mkdirSync(join(root, sessionDirSlug(cwd)), { recursive: true })
   const path = join(root, sessionDirSlug(cwd), '2026-10-02T00-00-00-000Z_sess-1.jsonl')
   writeFileSync(path, JSON.stringify({ type: 'message', message: { role: 'assistant', content: [{ type: 'toolCall', id: 'toolu_open', name: 'ask_user_question', arguments: { questions } }] } }) + '\n')
@@ -126,7 +126,7 @@ test('no session log at all: a single-question screen is posted from the screen'
   expect(r.posted!.questions[0]!.options.map((o) => o.label)).toEqual(['예', '아니오'])
 })
 
-test('OmOMeow\'s own pane is never posted', async () => {
+test('the lead\'s own pane is never posted', async () => {
   const r = await syncPaneQuestion({ pane: 'wW:p6', cwd: tmpdir(), session: null }, fx('omo-screen-single.txt'), deps, join(dir, 'none'))
   expect(r.skipped).toBe('self')
   expect(calls).toHaveLength(0)
@@ -135,7 +135,7 @@ test('OmOMeow\'s own pane is never posted', async () => {
 test('multi-question set: first answer keeps the rest open; multi-select toggles then 선택 완료; then the whole set is injected', async () => {
   const log = sessionLog([
     { header: '모드', question: '어떤 모드로 배포할까요?', multiSelect: false, options: [{ label: '스테이징' }, { label: '프로덕션' }] },
-    { header: '알림', question: '누구에게 알릴까요?', multiSelect: true, options: [{ label: '주인' }, { label: '오모냥' }, { label: '아무도' }] },
+    { header: '알림', question: '누구에게 알릴까요?', multiSelect: true, options: [{ label: '주인' }, { label: '모모' }, { label: '아무도' }] },
   ])
   screen = fx('omo-screen-multi-q1.txt').replace('어떤 모드로 배포할까요? 긴 설명이 붙은 질문이 줄바꿈될 때 파서가 잘 버티는지 보려고\n 일부러 길게 씁니다. 정말 긴 문장입니다.', '어떤 모드로 배포할까요?')
   const { posted } = await syncPaneQuestion({ pane: 'wX:p1', cwd: log.cwd, session: null }, screen, deps, log.root)
@@ -156,10 +156,10 @@ test('multi-question set: first answer keeps the rest open; multi-select toggles
   await handleInteraction(press(`oq|${id}|1|1`), deps)
   expect(keys).toHaveLength(0)
 
-  onKeys = (k) => { if (k[0] === 'tab') screen = fx('omo-screen-review.txt'); if (k[0] === 'enter') { log.resolve('answered', '모드: 프로덕션\n알림: 주인, 오모냥'); screen = IDLE_SCREEN } }
+  onKeys = (k) => { if (k[0] === 'tab') screen = fx('omo-screen-review.txt'); if (k[0] === 'enter') { log.resolve('answered', '모드: 프로덕션\n알림: 주인, 모모'); screen = IDLE_SCREEN } }
   await handleInteraction(press(`oq|${id}|1|c`), deps)
   expect(keys).toEqual([['2'], ['1'], ['2'], ['tab'], ['enter']])
-  expect(events.at(-1)).toMatchObject({ event: 'answer', injected: true, answers: [{ answer: '프로덕션' }, { answer: '주인, 오모냥' }] })
+  expect(events.at(-1)).toMatchObject({ event: 'answer', injected: true, answers: [{ answer: '프로덕션' }, { answer: '주인, 모모' }] })
   log.cleanup()
 })
 

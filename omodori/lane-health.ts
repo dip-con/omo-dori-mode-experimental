@@ -9,24 +9,24 @@
 //   bun lane-health.ts --once --all                    print every lane's state (read-only check: no state write, no migration)
 //   LANE_UNRESOLVED <key> ...   an open lane whose sessionId has no session file (map drift; registry-sync.ts --dry explains it)
 //   bun lane-health.ts --replay <session.jsonl> --at <iso> [--status idle] [--account NAME]
-//   bun lane-health.ts --simulate quota <key> --to <account>   (rpc-smoke / s9-test-* only) write OMOCAT/state/quota-sim/<key>.json
+//   bun lane-health.ts --simulate quota <key> --to <account>   (rpc-smoke / s9-test-* only) write DORI_HOME/state/quota-sim/<key>.json
 //                               so the supervisor quota policy treats the lane as quota-stopped (live check of S9)
 // Proposal only (redesign S9): the executor moved to dori-supervisor.ts (quota policy, per-episode approval
 // flags/auto-migrate.<key>). Targets use quota headroom (policy-lib.ts); the reset proposal needs N consecutive clear checks.
 // Rollback: remove the lane-health line from dori-monitors.sh (backup dori-monitors.sh.bak-20261023-improve).
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { cfg } from './config'
+import { cfg, doriHome, isLeadKey, homeRef } from './config'
 import { accountCheck, accountHeadroom, CLAUDE_PROVIDER, openToolCall, pickAccount, switchBackStep } from './policy-lib'
 
 const HOME = process.env.HOME!
-const OMOCAT = process.env.OMOCAT_HOME ?? `${HOME}/.omocat`
+const DORI_HOME = doriHome()
 const SESSIONS = `${HOME}/.omo/agent/sessions`
 const USAGE = `${HOME}/.omo/agent/subscription-usage.json`
 const AUTH = `${HOME}/.omo/agent/auth.json`
-const STATE = `${OMOCAT}/lane-health-state.json`
-const MIGRATIONS = `${OMOCAT}/lane-migrations.jsonl`
-const SIM_DIR = `${process.env.OMOCAT_HOME ?? OMOCAT}/state/quota-sim`
+const STATE = `${DORI_HOME}/lane-health-state.json`
+const MIGRATIONS = `${DORI_HOME}/lane-migrations.jsonl`
+const SIM_DIR = `${process.env.OMODORI_HOME ?? DORI_HOME}/state/quota-sim`
 export const CLAUDE_ACCOUNTS = cfg.claudeAccounts
 export const GPT_FALLBACK = { model: 'chatgpt-subscription/gpt-6-astra', thinking: 'high' }
 const REMIND_MS = 30 * 60_000
@@ -53,7 +53,7 @@ export function parseFooter(text: string): { tokens: number; window: number } | 
 
 export function contextEvent(key: string, pane: string, tokens: number, window: number): string {
   const pct = (tokens / window) * 100
-  const cmd = `bun ~/.omocat/lane-transition.ts ${key} --fresh --reason manual (after its turn)`
+  const cmd = `bun ${homeRef()}/lane-transition.ts ${key} --fresh --reason manual (after its turn)`
   return `LANE_CONTEXT ${key} pane=${pane} ctx=${Math.round(tokens / 1000)}K/${pct.toFixed(1)}% -> propose: ${cmd}`
 }
 
@@ -124,11 +124,11 @@ const kstHm = (ms: number) => new Date(ms + 9 * 3600_000).toISOString().slice(5,
 export function eventLine(key: string, pane: string, a: Assessment): string | null {
   const how = 'propose (lead approval)'
   if (a.state === 'quota') {
-    return `LANE_QUOTA ${key} pane=${pane} ${a.detail} -> ${how}: bun ~/.omocat/lane-transition.ts ${key} --fresh --account ${a.target} --reason quota`
+    return `LANE_QUOTA ${key} pane=${pane} ${a.detail} -> ${how}: bun ${homeRef()}/lane-transition.ts ${key} --fresh --account ${a.target} --reason quota`
   }
   if (a.state === 'quota_all') {
     const when = a.resetAt ? ` (soonest Claude reset ${kstHm(a.resetAt)})` : ''
-    return `LANE_QUOTA_ALL ${key} pane=${pane} ${a.detail}: all 3 Claude accounts full${when} -> ${how}: bun ~/.omocat/lane-transition.ts ${key} --fresh --model ${GPT_FALLBACK.model} --thinking ${GPT_FALLBACK.thinking} --reason quota`
+    return `LANE_QUOTA_ALL ${key} pane=${pane} ${a.detail}: all 3 Claude accounts full${when} -> ${how}: bun ${homeRef()}/lane-transition.ts ${key} --fresh --model ${GPT_FALLBACK.model} --thinking ${GPT_FALLBACK.thinking} --reason quota`
   }
   if (a.state === 'stalled') return `LANE_STALLED ${key} pane=${pane} ${a.detail}`
   return null
@@ -195,7 +195,7 @@ export function readOwnState(p: string, quarantine: boolean, now = Date.now()): 
   return { state: {}, line: `LANE_HEALTH_STATE_CORRUPT moved ${p} to ${aside}: ${why}; continuing with empty state (reminders/ctx/switch-back counters reset)` }
 }
 const writeJson = (p: string, v: unknown) => { const t = `${p}.${process.pid}.tmp`; writeFileSync(t, JSON.stringify(v, null, 1)); renameSync(t, p) }
-const log = (line: string) => { try { mkdirSync(`${OMOCAT}/logs`, { recursive: true }); appendFileSync(`${OMOCAT}/logs/lane-health.log`, `${new Date().toISOString()} ${line}\n`) } catch {} }
+const log = (line: string) => { try { mkdirSync(`${DORI_HOME}/logs`, { recursive: true }); appendFileSync(`${DORI_HOME}/logs/lane-health.log`, `${new Date().toISOString()} ${line}\n`) } catch {} }
 
 async function agentStatuses(): Promise<Map<string, string>> {
   const p = Bun.spawn(['herdr', 'agent', 'list'], { stdout: 'pipe', stderr: 'pipe' })
@@ -206,8 +206,8 @@ async function agentStatuses(): Promise<Map<string, string>> {
 
 async function sweep(stallMin: number, all: boolean, once = false) {
   const now = Date.now()
-  const map = readJson(`${OMOCAT}/sessions-map.json`, {})
-  const lanes = Object.values<any>(map).filter((e) => e?.status === 'open' && e.sessionId && !String(e.key).startsWith('dandori-lead'))
+  const map = readJson(`${DORI_HOME}/sessions-map.json`, {})
+  const lanes = Object.values<any>(map).filter((e) => e?.status === 'open' && e.sessionId && !isLeadKey(String(e.key)))
   const idx = sessionIndex()
   const statuses = await agentStatuses()
   const usage = readJson(USAGE, {}), auth = readJson(AUTH, {})
@@ -219,7 +219,7 @@ async function sweep(stallMin: number, all: boolean, once = false) {
     const uk = `unresolved:${e.key}`
     if (!file) {
       if (once || !state[uk] || now - state[uk]!.at >= REMIND_MS) {
-        const line = `LANE_UNRESOLVED ${e.key} pane=${e.pane} session=${e.sessionId}: no session file -> check: bun ~/.omocat/registry-sync.ts --dry`
+        const line = `LANE_UNRESOLVED ${e.key} pane=${e.pane} session=${e.sessionId}: no session file -> check: bun ${homeRef()}/registry-sync.ts --dry`
         console.log(line)
         if (!once) { log(line); state[uk] = { sig: 'unresolved', at: now } }
       }
@@ -264,7 +264,7 @@ async function sweep(stallMin: number, all: boolean, once = false) {
     state[sig] = { sig: String(step.count), at: now }
     if (!step.fire) continue
     const best = hs.filter((h) => accountCheck(h) === 'clear').sort((x, y) => y.score! - x.score!)[0]!
-    const line = `LANE_QUOTA_RESET ${m.newKey} account ${best.name} is available again (${step.count} clear checks) -> propose: bun ~/.omocat/lane-transition.ts ${m.newKey} --fresh --account ${best.name} --reason manual`
+    const line = `LANE_QUOTA_RESET ${m.newKey} account ${best.name} is available again (${step.count} clear checks) -> propose: bun ${homeRef()}/lane-transition.ts ${m.newKey} --fresh --account ${best.name} --reason manual`
     console.log(line); log(line); state[sig] = { sig: 'fired', at: now }
   }
   if (!once) writeJson(STATE, state)
@@ -283,7 +283,7 @@ if (import.meta.main) {
     const to = opt('--to')
     if (simulate !== 'quota' || !key || !to || !CLAUDE_ACCOUNTS.includes(to)) { console.log('usage: lane-health.ts --simulate quota <key> --to <default|86|work>'); process.exit(2) }
     if (key !== 'rpc-smoke' && !key.startsWith('s9-test-')) { console.log(`LANE_SIMULATE_REFUSED ${key}: only rpc-smoke and s9-test-* lanes`); process.exit(4) }
-    const e = readJson(`${process.env.OMOCAT_HOME ?? OMOCAT}/sessions-map.json`, {})[key]
+    const e = readJson(`${process.env.OMODORI_HOME ?? DORI_HOME}/sessions-map.json`, {})[key]
     if (!e || e.status !== 'open') { console.log(`LANE_SIMULATE_REFUSED ${key}: not open`); process.exit(4) }
     const sim = { episode: `sim:${key}:${e.sessionId}:${Date.now()}`, target: to, durableId: e.sessionId, at: new Date().toISOString() }
     mkdirSync(SIM_DIR, { recursive: true })

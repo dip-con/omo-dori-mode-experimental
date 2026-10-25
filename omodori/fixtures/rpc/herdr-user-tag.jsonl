@@ -1,1 +1,1 @@
-{"type":"message","id":"b1","parentId":null,"timestamp":"2026-10-23T00:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"hello\n\n[dandori-msg:fixture-id-2]"}]}}
+{"type":"message","id":"b1","parentId":null,"timestamp":"2026-10-23T00:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"hello\n\n[dori-msg:fixture-id-2]"}]}}

@@ -6,6 +6,7 @@ import { load as loadDecisions } from './decisions-lib'
 import { CEO_THREAD, DORI, HOME, flag, kst, openLanes, opt, post, readJson, readJsonl } from './dori-lib'
 import { EVENTS, type HbEvent } from './heartbeat'
 import { summary as patrolSummary } from './repo-patrol'
+import { cfg } from './config'
 
 const DAY = 86400_000
 const kstMidnight = (d = new Date()) => { const k = kst(d); return Date.parse(`${k.date}T00:00:00+09:00`) }
@@ -25,7 +26,7 @@ function incidents(): string[] {
   const open = Object.entries(state.checks).filter(([, c]) => !c.ok)
   if (!existsSync(`${DORI}/heartbeat/state.json`)) return ['■ 장애: 하트비트가 아직 안 돎음(LaunchAgent 미등록)']
   return [
-    `■ 장애: 발견 ${detected} · 자동 복구 ${recovered} · 형에게 알림 ${alerted.length} · 지금 열린 문제 ${open.length}${off ? ` · 카톡 꺼짐 ${off}회` : ''}`,
+    `■ 장애: 발견 ${detected} · 자동 복구 ${recovered} · ${cfg.owner.title}에게 알림 ${alerted.length} · 지금 열린 문제 ${open.length}${off ? ` · 카톡 꺼짐 ${off}회` : ''}`,
     ...alerted.slice(-3).map((e) => `  - ${md(Date.parse(e.at))} ${e.detail.slice(0, 80)}`),
     ...open.slice(0, 3).map(([id, c]) => `  - 열림: ${id} ${c.detail.slice(0, 60)}`),
   ]

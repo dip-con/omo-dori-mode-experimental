@@ -1,8 +1,9 @@
-// Only the secretary lane uses this gate. IDs stay strings, including open-chat IDs.
-import { cfg } from './config'
+// Only rooms with "gate": true in kakao-rooms.json use this gate. IDs stay strings, including open-chat IDs.
+// A line is addressed to the bot when it starts with one of the bot's call words (config.json bots[].calls).
+import { callSource, cfg, type Bot } from './config'
 export const SECRETARY_ID = cfg.kakao.botUserId
 const FOLLOWUP_MS = 5 * 60_000
-const ADDRESS = /^\s*@?(?:강비서|비서)(?:님|야|씨)?(?=$|[\s,!?~.:])/
+const addressOf = (bot: Bot) => { const s = callSource(bot); return s ? new RegExp(`^\\s*@?(?:${s})(?:님|야|아|씨)?(?=$|[\\s,!?~.:])`) : null }
 type Addressing = {
   readonly mentioned_user_ids?: readonly string[]
   readonly reply_to_user_id?: string
@@ -26,13 +27,14 @@ export function addressingFields(
   }
 }
 
-export function createSecretaryGate() {
+export function createSecretaryGate(bot: Bot) {
+  const ADDRESS = addressOf(bot)
   const engaged = new Map<string, number>()
   return (message: Addressing & {
     readonly chat: string; readonly sender: string; readonly text: string; readonly at: number
   }): 'called' | 'continued' | null => {
     const key = `${message.chat}:${message.sender}`
-    if (ADDRESS.test(message.text) || message.mentioned_user_ids?.includes(SECRETARY_ID)
+    if (ADDRESS?.test(message.text) || message.mentioned_user_ids?.includes(SECRETARY_ID)
       || message.reply_to_user_id === SECRETARY_ID) {
       engaged.set(key, message.at)
       return 'called'

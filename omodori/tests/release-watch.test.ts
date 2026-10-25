@@ -40,8 +40,8 @@ test('lockfile detection picks the matching audit tool and skips a bare yarn.loc
 })
 
 test('channels.json projects select the repo list', () => {
-  const text = JSON.stringify({ projects: { a: { key: 'acme', path: '/p/acme' }, b: { key: 'nopath' } } })
-  expect(reposFromChannels(text)).toEqual([{ key: 'acme', path: '/p/acme' }])
+  const text = JSON.stringify({ projects: { a: { key: 'app', path: '/p/app' }, b: { key: 'nopath' } } })
+  expect(reposFromChannels(text)).toEqual([{ key: 'app', path: '/p/app' }])
 })
 
 const snap = (over: Partial<{ installed: string; latest: string; repos: any[] }> = {}) => ({
@@ -80,7 +80,7 @@ test('a new release or a new high finding re-prints; errored repos are excluded 
 test('repos without an auditable lockfile are skipped: no total, no error line', () => {
   const repos = [
     { key: 'app-a', path: '/p/a', high: 1, critical: 0 },
-    { key: 'acme', path: '/p/s', high: 0, critical: 0, skip: true },
+    { key: 'app', path: '/p/s', high: 0, critical: 0, skip: true },
   ]
   const ls = eventLines(null, snap({ repos }))
   expect(ls).toEqual(['RELEASE_WATCH omo=5.1.40->5.1.44 high=1 critical=0 repos=app-a(h1/c0)'])
@@ -98,7 +98,7 @@ test('saved state survives a reload with the same counts', () => {
 test('cycle prints nothing on an unchanged replay of the same fixtures', async () => {
   const dir = tmp()
   writeFileSync(join(dir, 'omo.json'), '{"version":"5.1.40"}')
-  writeFileSync(join(dir, 'channels.json'), JSON.stringify({ projects: { a: { key: 'acme', path: '/p/acme' } } }))
+  writeFileSync(join(dir, 'channels.json'), JSON.stringify({ projects: { a: { key: 'app', path: '/p/app' } } }))
   const audit = async (r: { key: string; path: string }) => ({ ...r, high: 1, critical: 0 })
   const opts = {
     stateFile: join(dir, 'state.json'),
@@ -107,8 +107,8 @@ test('cycle prints nothing on an unchanged replay of the same fixtures', async (
     audit,
     latest: async () => '5.1.44',
   }
-  expect(await cycle(opts)).toEqual(['RELEASE_WATCH omo=5.1.40->5.1.44 high=1 critical=0 repos=acme(h1/c0)'])
+  expect(await cycle(opts)).toEqual(['RELEASE_WATCH omo=5.1.40->5.1.44 high=1 critical=0 repos=app(h1/c0)'])
   expect(await cycle(opts)).toEqual([])
   opts.latest = async () => '5.1.45'
-  expect(await cycle(opts)).toEqual(['RELEASE_WATCH omo=5.1.40->5.1.45 high=1 critical=0 repos=acme(h1/c0)'])
+  expect(await cycle(opts)).toEqual(['RELEASE_WATCH omo=5.1.40->5.1.45 high=1 critical=0 repos=app(h1/c0)'])
 })

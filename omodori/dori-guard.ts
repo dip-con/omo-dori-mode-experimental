@@ -3,12 +3,12 @@
 //   (a) `dori launch ... --thread <id>` / `sess.ts open ... <id>` with a project channel or #일반 id -> refuse.
 //   (b) kill/pkill/killall/herdr close aimed at the lead (wW:p6) or at the caller's own ancestors -> refuse.
 //   bun dori-guard.ts check "<command>"     prints BLOCK <reason> (exit 3) or ALLOW (exit 0)
-// Every BLOCK is appended to ~/.omocat/logs/dori-guard.log. Rollback: delete the extension file.
+// Every BLOCK is appended to ~/.omodori/logs/dori-guard.log. Rollback: delete the extension file.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
-import { cfg } from './config'
+import { cfg, doriHome, homeRef } from './config'
 
 const HOME = process.env.HOME!
-const LOG_DIR = `${HOME}/.omocat/logs`
+const LOG_DIR = `${doriHome()}/logs`
 const GENERAL = cfg.discord.generalChannel
 
 export type Verdict = { block: true; kind: 'channel' | 'kill'; reason: string } | null
@@ -25,7 +25,7 @@ export type GuardEnv = {
 export function loadChannels(): Map<string, string> {
   const m = new Map<string, string>([[GENERAL, '#일반']])
   try {
-    const c = JSON.parse(readFileSync(`${HOME}/.omocat/channels.json`, 'utf8'))
+    const c = JSON.parse(readFileSync(`${doriHome()}/channels.json`, 'utf8'))
     if (c.category_id) m.set(String(c.category_id), 'project category')
     for (const [id, p] of Object.entries<any>(c.projects ?? {})) m.set(id, `#${p.key ?? p.name ?? id}`)
   } catch {}
@@ -36,7 +36,7 @@ export function loadChannels(): Map<string, string> {
 // opening that one session and its migrations (<key>-mN) in the channel itself.
 export function channelSessionAllowed(channelId: string, laneKey: string | undefined): boolean {
   try {
-    const s = JSON.parse(readFileSync(`${HOME}/.omocat/channels.json`, 'utf8')).projects?.[channelId]?.session
+    const s = JSON.parse(readFileSync(`${doriHome()}/channels.json`, 'utf8')).projects?.[channelId]?.session
     if (!s?.key || !laneKey) return false
     return laneKey === s.key || (laneKey.startsWith(`${s.key}-m`) && /^\d+$/.test(laneKey.slice(s.key.length + 2)))
   } catch { return false }
@@ -127,7 +127,7 @@ function checkChannel(argv: string[], env: GuardEnv): Verdict {
     const id = raw.replace(/^discord:/, '')
     const label = env.channels.get(id)
     if (label && !channelSessionAllowed(id, laneKey)) {
-      return { block: true, kind: 'channel', reason: `dori-guard: ${id} is the channel ${label}, not a thread. Make a thread first (bun ~/.omocat/mkthread.ts <channel> <message-id> "<name>") and launch with that thread id.` }
+      return { block: true, kind: 'channel', reason: `dori-guard: ${id} is the channel ${label}, not a thread. Make a thread first (bun ${homeRef()}/mkthread.ts <channel> <message-id> "<name>") and launch with that thread id.` }
     }
   }
   return null
@@ -137,7 +137,7 @@ const SELF_REFS = /^(\$\$|\$PPID|\$\{PPID\}|\$\{\$\})$/
 function checkKill(argv: string[], env: GuardEnv): Verdict {
   const a = strip(argv)
   const cmd = base(a[0] ?? '')
-  const hit = (what: string) => ({ block: true as const, kind: 'kill' as const, reason: `dori-guard: refusing to ${what}: that is the Dandori lead (${env.leadPane}) or this session's own parent chain. Ask the owner if it really must stop.` })
+  const hit = (what: string) => ({ block: true as const, kind: 'kill' as const, reason: `dori-guard: refusing to ${what}: that is the lead (${env.leadPane}) or this session's own parent chain. Ask the owner if it really must stop.` })
   if (cmd === 'kill') {
     let args = a.slice(1)
     if (args[0] === '-s' || args[0] === '-n') args = args.slice(2)

@@ -1,9 +1,9 @@
 // Move a lane to a fresh session on another Claude account (or GPT Astra high when all three are full) (dori-improve 2).
 //   bun lane-migrate.ts <key> --to <default|alt|work> [--live] [--force]
 //   bun lane-migrate.ts <key> --model chatgpt-subscription/gpt-6-astra --thinking high [--live] [--force]
-// Thin wrapper over the lane transition (redesign S8, final.md §2.8): the lane keeps its key and gets a fresh session with
+// Thin wrapper over the lane transition (redesign S8): the lane keeps its key and gets a fresh session with
 // a handoff artifact; kakao lanes work too (their profile carries extensions/tools). Without --live it prints the plan
-// (--dry, nothing changes). Log: ~/.omocat/lane-migrations.jsonl. Last line: MIGRATE_DONE | MIGRATE_DRY_RUN | MIGRATE_REFUSED.
+// (--dry, nothing changes). Log: ~/.omodori/lane-migrations.jsonl. Last line: MIGRATE_DONE | MIGRATE_DRY_RUN | MIGRATE_REFUSED.
 const argv = process.argv.slice(2)
 const opt = (n: string) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : undefined }
 const key = argv[0]

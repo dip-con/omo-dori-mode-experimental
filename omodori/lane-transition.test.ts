@@ -15,12 +15,10 @@ const P = await import('./kakao-push')
 
 const FX = join(import.meta.dir, 'fixtures', 'transition')
 const PROFILES = join(import.meta.dir, 'lane-profiles')
-const OLD_ARGV: Record<string, { argv: string[]; env: Record<string, string> }> = JSON.parse(readFileSync(join(FX, 'old-argv.json'), 'utf8'))
 const OLD = '0ld00000-0000-4000-8000-000000000001'
 const KEY = 's8-test-a'
 const GPT = 'chatgpt-subscription/gpt-6-astra'
 
-const isSubsequence = (small: string[], big: string[]) => { let i = 0; for (const t of big) if (t === small[i]) i++; return i === small.length }
 const profile = (n: string) => T.loadProfile(n, PROFILES)
 
 function shellTokens(line: string): string[] {
@@ -98,7 +96,7 @@ function harness(o: HOpts = {}) {
       sends.push({ id, text })
       if (h.seed === 'never') return { status: 'uncertain', reason: 'no_receipt' }
       const f = h.sessionFile(e.sessionId)
-      writeFileSync(f, JSON.stringify({ type: 'custom_message', customType: 'session_control_delivery', content: `${text}\n\n[dandori-msg:${id}]`, details: { delivery_id: id }, timestamp: new Date().toISOString() }) + '\n', { flag: 'a' })
+      writeFileSync(f, JSON.stringify({ type: 'custom_message', customType: 'session_control_delivery', content: `${text}\n\n[dori-msg:${id}]`, details: { delivery_id: id }, timestamp: new Date().toISOString() }) + '\n', { flag: 'a' })
       return { status: 'delivered' }
     },
     sessionProcs: async () => [],
@@ -120,29 +118,26 @@ async function killLease(home: string, key: string) {
   writeFileSync(f, JSON.stringify(o))
 }
 
-test('argv: --account alt on the kakao-dandori-docs profile has --claude-account alt and the profile ext; old script argv is a subset', () => {
-  for (const [key, old] of Object.entries(OLD_ARGV)) {
+test('argv: the example kakao profiles expand {install}/{home}, keep their tool allowlist, add --claude-account only when asked', () => {
+  for (const key of ['kakao-chat', 'kakao-docs']) {
     const prof = profile(key)
     for (const account of [undefined, 'alt']) {
-      const spec = T.sessionSpec(prof, undefined, { account })
-      const argv = T.buildArgv({ key, sessionId: 'SID-1', ...spec, profile: prof })
-      expect(isSubsequence(old.argv.map((t) => (t === '<SID>' ? 'SID-1' : t.replace(/^\/Users\/owner(?=\/)/, process.env.HOME!))), argv)).toBe(true)
+      const argv = T.buildArgv({ key, sessionId: 'SID-1', ...T.sessionSpec(prof, undefined, { account }), profile: prof })
+      expect(argv.join(' ')).not.toMatch(/\{(home|install)\}/)
+      expect(argv.join(' ')).toMatch(/-e \S*\/kakao-lane-ext\.ts/)
+      expect(argv[argv.indexOf('--tools') + 1]).toBe(prof.tools!)
       if (account) expect(argv.slice(argv.indexOf('--claude-account'), argv.indexOf('--claude-account') + 2)).toEqual(['--claude-account', 'alt'])
       else expect(argv).not.toContain('--claude-account')
     }
-    expect(prof.noClaim).toBe(old.env.OMOMEOW_NO_CLAIM === '1')
+    expect(prof.noClaim).toBe(true)
   }
-  const dd = T.buildArgv({ key: 'kakao-dandori-docs', sessionId: 'S', ...T.sessionSpec(profile('kakao-dandori-docs'), undefined, { account: 'alt' }), profile: profile('kakao-dandori-docs') })
-  expect(dd.join(' ')).toMatch(/-e \S*kakao-dandori-docs-ext\.ts/)
-  const jd = T.buildArgv({ key: 'kakao-family', sessionId: 'S', ...T.sessionSpec(profile('kakao-family'), undefined, { account: 'alt' }), profile: profile('kakao-family') })
-  expect(jd[jd.indexOf('--tools') + 1]).toContain('kakao_send')
 })
 
-test('argv: GPT fallback has OMOMEOW_MODEL=chatgpt-subscription/gpt-6-astra, thinking high, no --claude-account', () => {
-  const prof = profile('kakao-friend')
+test('argv: GPT fallback has OMODORI_MODEL=chatgpt-subscription/gpt-6-astra, thinking high, no --claude-account', () => {
+  const prof = profile('kakao-chat')
   const spec = T.sessionSpec(prof, { model: 'anthropic-subscription/claude-opus-5-5' } as any, { model: GPT, thinking: 'high' })
-  const argv = T.buildArgv({ key: 'kakao-friend', sessionId: 'S', ...spec, profile: prof })
-  expect(argv).toContain(`OMOMEOW_MODEL=${GPT}`)
+  const argv = T.buildArgv({ key: 'kakao-chat', sessionId: 'S', ...spec, profile: prof })
+  expect(argv).toContain(`OMODORI_MODEL=${GPT}`)
   expect(argv.slice(argv.indexOf('--model'), argv.indexOf('--model') + 2)).toEqual(['--model', GPT])
   expect(argv[argv.indexOf('--thinking') + 1]).toBe('high')
   expect(argv).not.toContain('--claude-account')
@@ -151,9 +146,9 @@ test('argv: GPT fallback has OMOMEOW_MODEL=chatgpt-subscription/gpt-6-astra, thi
 })
 
 test('argv: Claude return (lane on GPT, --account default) has --claude-account and the profile model', () => {
-  const prof = profile('kakao-acme-docs')
+  const prof = profile('kakao-docs')
   const spec = T.sessionSpec(prof, { model: GPT, thinking: 'high' } as any, { account: 'default' })
-  const argv = T.buildArgv({ key: 'kakao-acme-docs', sessionId: 'S', ...spec, profile: prof })
+  const argv = T.buildArgv({ key: 'kakao-docs', sessionId: 'S', ...spec, profile: prof })
   expect(spec.model).toBe(prof.model!)
   expect(argv.slice(argv.indexOf('--claude-account'), argv.indexOf('--claude-account') + 2)).toEqual(['--claude-account', 'default'])
   expect(argv[argv.indexOf('--thinking') + 1]).toBe('medium')
@@ -209,7 +204,7 @@ test('happy path: generation +1, transition via, seed applied, old tab closed on
   expect((e.lineage as any).sessions).toContain(OLD)
   expect(count(h.calls, /^tab close t-old$/)).toBe(1)
   expect((r.out.argv as string[]).join(' ')).toContain('--claude-account alt')
-  expect(occurrences(h.sessionFile(e.sessionId), `[dandori-msg:seed:${KEY}:6]`)).toBe(1)
+  expect(occurrences(h.sessionFile(e.sessionId), `[dori-msg:seed:${KEY}:6]`)).toBe(1)
   expect(existsSync(join(h.home, 'lane-leases', KEY))).toBe(false)
   expect(readFileSync(join(h.home, 'lane-migrations.jsonl'), 'utf8')).toContain(`"newKey":"${KEY}"`)
 })
@@ -305,7 +300,7 @@ for (const point of ['after-inventory', 'before-close', 'after-seed-send', 'afte
     expect(count(h.calls, /^tab close t-old$/)).toBe(1)
     expect(count(h.calls, /^tab create/)).toBe(1)
     expect(count(h.calls, /^pane run/)).toBe(1)
-    expect(occurrences(h.sessionFile(op.newSessionId), `[dandori-msg:${op.seedId}]`)).toBe(1)
+    expect(occurrences(h.sessionFile(op.newSessionId), `[dori-msg:${op.seedId}]`)).toBe(1)
     const ids = h.sends.map((s) => s.id)
     expect(ids).toEqual(['d-error:g6', 'd-none:g6'])
     expect(readFileSync(join(h.home, 'lane-transitions.jsonl'), 'utf8').trim().split('\n').length).toBe(1)
@@ -337,32 +332,35 @@ test('seed unconfirmed: new tab closed, lease released, last 80 screen lines kep
 
 test('kakao profile on a temp lane: profile argv, noClaim artifact, beforeClose hook before the close', async () => {
   const h = harness({ profileKey: 's8-test-k' })
-  const r = await T.startTransition(h.deps, { key: 's8-test-k', reason: 'quota', profile: 'kakao-dandori-docs', account: 'alt' })
+  const dir = mkdtempSync(join(tmpdir(), 's8-profiles-'))
+  writeFileSync(join(dir, 'kakao-hooked.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(PROFILES, 'kakao-docs.json'), 'utf8')), beforeClose: [['python3', '/tmp/index.py']] }))
+  h.deps.profilesDir = dir
+  const r = await T.startTransition(h.deps, { key: 's8-test-k', reason: 'quota', profile: 'kakao-hooked', account: 'alt' })
   expect(r.exit).toBe(0)
   const argv = (r.out.argv as string[]).join(' ')
   expect(argv).toContain('--claude-account alt')
-  expect(argv).toMatch(/kakao-dandori-docs-ext\.ts/)
+  expect(argv).toMatch(/kakao-lane-ext\.ts/)
   const op = T.readOp(h.home, r.out.opId as string)
   expect(readFileSync(op.artifact!, 'utf8')).not.toContain('dori claim-done')
   const hook = h.calls.findIndex((c) => c.startsWith('hook python3'))
   expect(hook).toBeGreaterThanOrEqual(0)
   expect(hook).toBeLessThan(h.calls.indexOf('tab close t-old'))
-  expect(readMap(h.home)['s8-test-k']!.profile).toBe('kakao-dandori-docs')
+  expect(readMap(h.home)['s8-test-k']!.profile).toBe('kakao-hooked')
 })
 
-test('lane missing from the registry opens fresh from the profile (dandori-docs first run)', async () => {
-  const h = harness({ noEntry: true, profileKey: 'kakao-dandori-docs' })
-  const r = await T.startTransition(h.deps, { key: 'kakao-dandori-docs', reason: 'reset', profile: 'kakao-dandori-docs', settleTimeoutMs: 0 })
+test('lane missing from the registry opens fresh from the profile (first run)', async () => {
+  const h = harness({ noEntry: true, profileKey: 'kakao-docs' })
+  const r = await T.startTransition(h.deps, { key: 'kakao-docs', reason: 'reset', profile: 'kakao-docs', settleTimeoutMs: 0 })
   expect(r.exit).toBe(0)
   expect(count(h.calls, /^tab close/)).toBe(0)
-  const e = readMap(h.home)['kakao-dandori-docs']!
-  expect([e.generation, e.label, (e.seed as any).state]).toEqual([1, '리드방 장도리 문서', 'applied'])
+  const e = readMap(h.home)['kakao-docs']!
+  expect([e.generation, e.label, (e.seed as any).state]).toEqual([1, 'kakao-docs', 'applied'])
 })
 
 test('dry plan reads only: argv for --account alt, no lease, no op, no map change', async () => {
   const h = harness()
   const before = readFileSync(join(h.home, 'sessions-map.json'), 'utf8')
-  const r = await T.planTransition(h.deps, args(h, { account: 'alt', profile: 'kakao-dandori-docs' }))
+  const r = await T.planTransition(h.deps, args(h, { account: 'alt', profile: 'kakao-docs' }))
   expect(r.exit).toBe(0)
   const argv = r.out.argv as string[]
   expect(argv[argv.indexOf('--claude-account') + 1]).toBe('alt')
