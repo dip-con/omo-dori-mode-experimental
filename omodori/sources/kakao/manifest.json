@@ -1,0 +1,163 @@
+{
+  "name": "kakao",
+  "title": "카톡",
+  "description": "KakaoTalk: live stream over LOCO (agent-messenger), per-room lanes, delivery queue with receipts",
+  "module": "source.ts",
+  "usesBots": true,
+  "lanePrefix": "kakao-",
+  "settings": [
+    {
+      "key": "healthChatId",
+      "kind": "id",
+      "required": true,
+      "prompt": "Chat id of a busy room kakao-health watches for fresh messages (numeric)"
+    },
+    {
+      "key": "botUserId",
+      "kind": "id",
+      "prompt": "The bot account's own KakaoTalk user id (numeric; blank if unknown yet)"
+    },
+    {
+      "key": "ownerRoom",
+      "kind": "string",
+      "prompt": "Name of the owner's 1:1 room (as in kakao-rooms.json)"
+    },
+    {
+      "key": "ragChatIds",
+      "kind": "ids",
+      "prompt": "Chat ids whose answers go through the RAG guard (comma separated, optional)"
+    },
+    {
+      "key": "locoPort",
+      "kind": "port",
+      "default": 8397,
+      "prompt": "kakao-loco's local API port"
+    },
+    {
+      "key": "archiveRoot",
+      "kind": "path",
+      "default": "~/KakaoArchive",
+      "prompt": "KakaoTalk archive folder (kka)"
+    },
+    {
+      "key": "archiveSyncLabel",
+      "kind": "label",
+      "default": "com.example.kakao-archive.sync",
+      "prompt": "LaunchAgent label of the kka archive sync job"
+    },
+    {
+      "key": "requestsLedger",
+      "kind": "path",
+      "prompt": "Requests ledger file (optional)"
+    },
+    {
+      "key": "generatedImagesDir",
+      "kind": "path",
+      "default": "~/generated-images/",
+      "prompt": "Folder for generated images the bots send"
+    },
+    {
+      "key": "docOutDir",
+      "kind": "path",
+      "prompt": "Output folder of the document bot (optional)"
+    },
+    {
+      "key": "issueRefRooms",
+      "kind": "strings",
+      "prompt": "Room names where issue references are expanded (comma separated, optional)"
+    }
+  ],
+  "credentials": [
+    {
+      "file": "~/.config/agent-messenger/kakaotalk-credentials.json",
+      "how": "agent-kakaotalk auth login  (agent-messenger; log in as the bot account, tablet sub-device)"
+    }
+  ],
+  "dataFiles": [
+    {
+      "file": "kakao-rooms.json",
+      "example": "examples/kakao-rooms.json",
+      "what": "rooms: chat id -> name, lane, owner ids, per-room flags (gate, replyRefs, noJev, maskPii, stripSelf, wakeFilter)",
+      "entries": {
+        "keyPrompt": "Room chat id (numeric, blank to finish)",
+        "keyKind": "id",
+        "fields": [
+          {
+            "key": "name",
+            "prompt": "Room name"
+          },
+          {
+            "key": "lane",
+            "prompt": "Lane key for this room",
+            "default": "kakao-chat"
+          },
+          {
+            "key": "owner",
+            "prompt": "Owner user ids in this room (comma separated)",
+            "list": true
+          }
+        ]
+      }
+    }
+  ],
+  "launchAgents": {
+    "kakao-live": {
+      "args": [
+        "{bun}",
+        "kakao-loco.ts"
+      ],
+      "keepAlive": true,
+      "out": "{logs}/live.ndjson",
+      "err": "{logs}/live.err.log"
+    },
+    "kakao-push": {
+      "args": [
+        "{bun}",
+        "kakao-push.ts"
+      ],
+      "keepAlive": true,
+      "throttle": 10,
+      "out": "{logs}/push.log"
+    },
+    "kakao-health": {
+      "args": [
+        "/bin/bash",
+        "kakao-health.sh"
+      ],
+      "interval": 60,
+      "out": "{logs}/health.log"
+    },
+    "wake-filter-stats": {
+      "args": [
+        "{bun}",
+        "wake-filter-stats.ts"
+      ],
+      "calendar": {
+        "Hour": 9,
+        "Minute": 0
+      },
+      "out": "{logs}/wake-filter-stats.log"
+    }
+  },
+  "defaultAgents": [
+    "kakao-live",
+    "kakao-push",
+    "kakao-health"
+  ],
+  "healthCheck": [
+    "/bin/bash",
+    "{dir}/kakao-health.sh"
+  ],
+  "laneProfiles": "lane-profiles",
+  "eventRules": "event-rules.json",
+  "monitors": [
+    [
+      "{bun}",
+      "{dir}/kakao-stall.ts",
+      "--loop",
+      "5"
+    ]
+  ],
+  "transcriptSend": "kakao-say\\.ts\\s+(\\w+)\\s+\\\\?\"(.+?)\\\\?\"(?=[\\s`'),}]|$)",
+  "configFragment": "examples/config.fragment.json"
+}

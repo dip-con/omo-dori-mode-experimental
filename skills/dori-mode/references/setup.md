@@ -71,6 +71,18 @@ Arm these as persistent monitors in your own session:
 | Slack inbound (Slack only) | `dori inbound slack --loop 1` | `^INBOUND` |
 | presence (optional) | `dori presence slack` or `dori presence discord` | `^PRESENCE_READY` |
 
-## 6. First look around
+## 6. omodori runtime (only if the owner runs it)
+
+`omodori/` in this repo is the always-on runtime (lane supervisor, event router, heartbeat). Install the core first, then connect the owner's chat rooms one messenger source at a time:
+
+```sh
+omodori/install.sh --apply        # core only; works with no source connected
+omodori sources                   # which sources exist
+omodori onboard <source> --dry-run
+```
+
+Show the owner the dry-run output, ask for each setting it lists (room ids, bot name and call words), then run `omodori onboard <source> --set key=value ...`. It checks the config, loads only that source's LaunchAgents and runs its health check. `omodori/docs/PORTING.md` has the full checklist.
+
+## 7. First look around
 
 Once the bot is live, explore the machine: running coding-agent sessions, the tools in use, recent logs. Write what you find into memory, and adopt any running lanes with `dori adopt`.

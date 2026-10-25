@@ -1,0 +1,20 @@
+{
+  "name": "discord",
+  "title": "디스코드",
+  "description": "Discord: owner messages and button presses via the bot gateway (listener.ts, a lead monitor), sends via the bot REST API",
+  "module": "source.ts",
+  "settings": [],
+  "credentials": [
+    {
+      "file": "~/.config/agent-messenger/discordbot-credentials.json",
+      "how": "agent-discordbot auth  (agent-messenger; bots.<discord.botName>.token)"
+    }
+  ],
+  "launchAgents": {},
+  "defaultAgents": [],
+  "healthCheck": [
+    "{bun}",
+    "{dir}/source.ts",
+    "--health"
+  ]
+}

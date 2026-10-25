@@ -7,10 +7,10 @@
 | 파일 | 역할 |
 |---|---|
 | `~/.omodori/decisions.jsonl` | 결정 한 건이 한 줄. 필드: id, question, options(2~3), due, default, category, reversible, source(출처 레인), context, status(open/resolved/defaulted/cancelled), held, answer, resolvedBy, askId |
-| `~/.omodori/decisions-lib.ts` | 저장·검증·안전 규칙(공통) |
-| `~/.omodori/decision.ts` | CLI와 묶음 발송 |
-| `~/.omodori/decision-tools.ts` | 레인용 도구 `decision_add`, `decision_check` |
-| `~/.omodori/launchagents/com.example.dori.decisions.plist` | 5분마다 `tick`: 버튼 답 반영, 기한 처리, 08:30/21:00 묶음 발송 |
+| `~/.omodori/core/decisions-lib.ts` | 저장·검증·안전 규칙(공통) |
+| `~/.omodori/core/decision.ts` | CLI와 묶음 발송 |
+| `~/.omodori/core/decision-tools.ts` | 레인용 도구 `decision_add`, `decision_check` |
+| `~/Library/LaunchAgents/com.example.dori.decisions.plist` | 5분마다 `tick`: 버튼 답 반영, 기한 처리, 08:30/21:00 묶음 발송 |
 
 ## 안전 규칙 (주인 10-17)
 - category가 `money`, `contract`, `customer`(고객에게 나가는 메시지)이면 기본값은 **항상 "보류"**다. 넣을 때 다른 값을 줘도 보류로 바뀐다.
@@ -29,7 +29,7 @@
    // export default function (pi) { ... 안에서
    registerDecisionTools(pi, '<lane-key>')
    ```
-2. ext가 없는 레인은 실행 인자에 `-e ~/.omodori/decision-tools.ts`를 넣고 환경변수 `DORI_LANE_KEY=<lane-key>`를 준다.
+2. ext가 없는 레인은 실행 인자에 `-e ~/.omodori/core/decision-tools.ts`를 넣고 환경변수 `DORI_LANE_KEY=<lane-key>`를 준다.
 3. 레인이 `--tools` 허용 목록을 쓰면 `decision_add,decision_check`를 추가한다.
 4. 적용은 다음 재시작 때 `lane-restart.sh <key> --live`로 한다. 작업 중인 레인은 기다린다.
 

@@ -1,6 +1,6 @@
-# 공개 전 검사 (2026-10-25)
+# 공개 전 검사 (2026-10-25, 3차 core/sources 재검사 2026-10-26)
 
-대상: 저장소 전체(`git ls-files --cached --others --exclude-standard`, node_modules 제외) 205개 파일.
+대상: 저장소 전체(`git ls-files --cached --others --exclude-standard`, node_modules 제외) 221개 파일(3차).
 
 | 검사 | 도구 / 방법 | 결과 |
 |---|---|---|
@@ -20,8 +20,8 @@
 
 - 실제 ID는 자릿수가 같은 가짜 값으로 바꿨다(`1000000000000000001`, `18000000000000001` 등). 카톡 ID는 2^53 정밀도 테스트가 의미를 갖도록 크기를 유지했다.
 - 테스트·예시의 사람·방 이름은 가상 이름(`주인`, `동료A`, `친구B`, `리드방`, `모임방`, `업무방`)이다. 봇 이름·호출어·설명은 코드에 없고 config.json `bots[]`에만 있다(예시는 가상의 `모모`/`루루`).
-- `tests/daily-review.test.ts`의 `glpat-...` 문자열은 마스킹을 시험하는 가짜 토큰이라 `gitleaks:allow` 주석을 달았다.
-- 테스트는 실제 `~/.omodori`과 `~/.config`를 읽지 않는다. `tests/setup-config.ts`가 임시 HOME에 `tests/fixtures/dori-home`을 복사하고 가짜 Discord 토큰 파일을 만든다.
+- `core/tests/daily-review.test.ts`의 `glpat-...` 문자열은 마스킹을 시험하는 가짜 토큰이라 `gitleaks:allow` 주석을 달았다.
+- 테스트는 실제 `~/.omodori`과 `~/.config`를 읽지 않는다. `core/tests/setup-config.ts`가 임시 HOME에 `core/tests/fixtures/dori-home`과 각 소스의 `fixtures/home`을 복사하고 가짜 Discord 토큰 파일을 만든다.
 - 메시지 log id 몇 개(`3946...`, `3955...`, `9020...`)는 남겼다. 사람·방을 가리키지 않는 메시지 번호이고, 정밀도 테스트가 그 값을 쓴다.
 - 커밋 작성자는 GitHub noreply 주소를 쓴다.
 

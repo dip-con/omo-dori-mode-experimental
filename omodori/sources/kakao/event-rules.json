@@ -1,0 +1,39 @@
+{
+  "note": "KakaoTalk rules merged into core/event-rules.json by event-router.ts when this source is enabled (source rules are checked first).",
+  "legacyVisible": "^KAKAO_STALL",
+  "events": [
+    {
+      "kind": "kakao.stuck",
+      "route": "act"
+    },
+    {
+      "kind": "kakao.batch",
+      "route": "info"
+    },
+    {
+      "kind": "kakao.split",
+      "route": "info"
+    },
+    {
+      "kind": "kakao.recovered",
+      "route": "info"
+    }
+  ],
+  "legacy": [
+    {
+      "re": "^KAKAO_STALL_RECOVERED\\b",
+      "kind": "kakao.recovered",
+      "route": "info"
+    },
+    {
+      "re": "^KAKAO_STALL live\\b",
+      "kind": "kakao.stall_live",
+      "route": "ask"
+    },
+    {
+      "re": "^KAKAO_STALL\\b",
+      "kind": "kakao.stall",
+      "route": "info"
+    }
+  ]
+}

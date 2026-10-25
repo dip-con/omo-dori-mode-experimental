@@ -44,9 +44,9 @@ state/
 flags/
 lane-status.json
 
-# S7 kakao queue db
-kakao-queue.sqlite
-kakao-queue.sqlite-*
+# delivery queues (core source-queue.sqlite and each messenger source's own)
+*-queue.sqlite
+*-queue.sqlite-*
 
 # S8 runtime ledgers
 ops/
@@ -56,7 +56,7 @@ handoffs/
 # per-machine config and data (examples/ holds the templates)
 /config.json
 /channels.json
-/kakao-rooms.json
+/*-rooms.json
 /seo-sites.json
 /repo-patrol.json
 /owner-profile.md

@@ -147,7 +147,7 @@ The tests never touch a real pane, repo or GitHub.
 
 ## Discord + KakaoTalk runtime (omodori)
 
-[`omodori/`](omodori/README.md) is the always-on runtime a Dori runs on a Mac: the Discord bot, lane supervisor over omo RPC, KakaoTalk live stream and per-room lanes, decision inbox and self-heal heartbeat. Every per-machine value lives in one `config.json`; `omodori/install.sh` checks the dependencies and renders the LaunchAgents (dry run by default). Porting checklist: [`omodori/docs/PORTING.md`](omodori/docs/PORTING.md).
+[`omodori/`](omodori/README.md) is the always-on runtime a Dori runs on a Mac. `omodori/core/` is the same on every machine: lane supervisor over omo RPC, event router, lane open/close/handover, guards, heartbeat, decision inbox. `omodori/sources/<name>/` are the messenger sources (KakaoTalk live stream and per-room lanes, Discord inbound), which differ per machine. Order: install the core (`omodori/install.sh`, dry run by default; it works with no source connected), then connect each source with `omodori onboard <source>` (settings, rooms, bot, config check, only that source's LaunchAgents, health check; `--dry-run` shows what it would write). Porting checklist: [`omodori/docs/PORTING.md`](omodori/docs/PORTING.md).
 
 ## License
 

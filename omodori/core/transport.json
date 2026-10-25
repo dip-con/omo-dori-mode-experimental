@@ -1,0 +1,6 @@
+{
+  "default": "rpc",
+  "rpc": [
+    "rpc-smoke"
+  ]
+}

@@ -147,7 +147,7 @@ bunx tsc --noEmit  # 타입 검사
 
 ## Discord + 카카오톡 런타임 (omodori)
 
-[`omodori/`](omodori/README.md)는 도리가 Mac에서 상시 돌리는 런타임이다: Discord 봇, omo RPC 기반 lane supervisor, 카카오톡 실시간 수신과 방별 lane, 결정함, 자가 복구 heartbeat. 기기마다 다른 값은 `config.json` 하나에 모여 있고, `omodori/install.sh`가 의존성을 확인하고 LaunchAgent를 만든다(기본은 dry run). 새 PC 체크리스트: [`omodori/docs/PORTING.md`](omodori/docs/PORTING.md).
+[`omodori/`](omodori/README.md)는 도리가 Mac에서 상시 돌리는 런타임이다. `omodori/core/`는 어느 PC나 같은 부분이다: omo RPC 기반 lane supervisor, 이벤트 라우터, lane 열기·닫기·인계, 가드, heartbeat, 결정함. `omodori/sources/<이름>/`은 PC마다 다른 메신저 소스다(카카오톡 실시간 수신과 방별 lane, Discord 수신). 순서는 설치(core) → 온보딩(소스 연결)이다: `omodori/install.sh`가 core만 설치하고(기본은 dry run, 소스 0개로도 동작), `omodori onboard <소스>`가 설정값·방 목록·봇을 받고 config를 검사한 뒤 그 소스의 LaunchAgent만 등록하고 health를 확인한다(`--dry-run`으로 바뀔 것만 볼 수 있다). 새 PC 체크리스트: [`omodori/docs/PORTING.md`](omodori/docs/PORTING.md).
 
 ## 라이선스
 
