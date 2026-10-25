@@ -3,7 +3,7 @@
 #   lane-restart.sh <lane-key>          dry run: checks + prints the exact relaunch command, changes nothing
 #   lane-restart.sh <lane-key> --live   /quit -> relaunch `omo ... --session <jsonl>` -> real verification turn
 #   --force                             (humans only) proceed when children are unknown, as long as the lane is idle
-# Refuses (exit 4) unless the supervisor snapshot says the lane is settled (final.md §2.5): children_unknown when child work
+# Refuses (exit 4) unless the supervisor snapshot says the lane is settled: children_unknown when child work
 # cannot be observed, children_running while subagents/DAG runs are live, not_settled otherwise. Never replays the raw bun/cli.js argv
 # (that loses auth: agent dir falls back to ~/.senpi/agent). Last output line is the one-line result.
 export PATH=$HOME/.local/bin:$HOME/.bun/bin:$HOME/.local/node-current/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
@@ -11,7 +11,7 @@ set -u
 KEY=${1:?usage: lane-restart.sh <lane-key> [--live] [--force]}
 LIVE=0; FORCE=0
 for a in "${@:2}"; do case "$a" in --live) LIVE=1 ;; --force) FORCE=1 ;; *) echo "unknown option $a" >&2; exit 2 ;; esac; done
-D=${OMOCAT_HOME:-$HOME/.omocat}
+D=${OMODORI_HOME:-$HOME/.omodori}
 export D
 LOG=$D/heartbeat/lane-restart.log
 mkdir -p "$D/heartbeat"

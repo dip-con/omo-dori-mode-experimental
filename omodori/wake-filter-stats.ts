@@ -57,7 +57,7 @@ export function summarize(rows: Row[], start: Date, end: Date): Summary {
       else if (r.decision === 'wake') t.jevWake++
       else if (r.decision === 'skip') { t.skip++; if (r.reason === 'reaction') t.reaction++; if (r.triage === 'collect') t.collect++ }
       else if (r.decision === 'fail-open') t.failOpen[r.reason ?? '?'] = (t.failOpen[r.reason ?? '?'] ?? 0) + 1
-      // A [ACME] 테스트 burst is one Jev call logged on every line; only its first line counts the call.
+      // A [작업] 문서방 burst is one Jev call logged on every line; only its first line counts the call.
       const called = !r.follower && (r.reason === 'jev' || r.reason === 'followup' || (r.decision === 'fail-open' && r.reason !== 'no-key'))
       if (called) { t.jevCalls++; t.tokens += r.tokens ?? FALLBACK_TOKENS }
       if (called && (r.reason === 'jev' || r.reason === 'followup') && typeof r.ms === 'number') t.latencies.push(r.ms)

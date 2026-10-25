@@ -1,1 +1,1 @@
-{"type":"host_superseded","instanceId":"OLD","generation":0,"successor":{"socket":"/tmp/omocat/fixture/rpc-successor.sock"}}
+{"type":"host_superseded","instanceId":"OLD","generation":0,"successor":{"socket":"/tmp/omodori/fixture/rpc-successor.sock"}}

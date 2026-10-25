@@ -15,7 +15,7 @@ let post: (channel: string, text: string) => Promise<string[]>
 
 beforeAll(async () => {
   mkdirSync(`${home}/.config/agent-messenger`, { recursive: true })
-  writeFileSync(`${home}/.config/agent-messenger/discordbot-credentials.json`, JSON.stringify({ bots: { omocat: { token: 'fake-test-token' } } }))
+  writeFileSync(`${home}/.config/agent-messenger/discordbot-credentials.json`, JSON.stringify({ bots: { assistant: { token: 'fake-test-token' } } }))
   process.env.HOME = home
   globalThis.fetch = (async (url: string, init: RequestInit) => {
     sent.push({ url: String(url), body: JSON.parse(String(init.body)) })

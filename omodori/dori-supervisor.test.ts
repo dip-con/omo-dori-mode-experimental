@@ -1,4 +1,4 @@
-// OMOCAT_HOME=$(mktemp -d) bun test dori-supervisor.test.ts
+// OMODORI_HOME=$(mktemp -d) bun test dori-supervisor.test.ts
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -70,11 +70,11 @@ function world(home: string, specs: Record<string, HostSpec>, opts: { panes?: st
   const registry = { endpoints: Object.entries(specs).map(([socket, s]) => ({ socket, kind: s.kind } as Endpoint)) }
   const map = {
     'rpc-smoke': {
-      key: 'rpc-smoke', label: 'rpc-smoke', cwd: '/tmp/omocat/rpc-smoke', thread: null, workspace: 'w21', tab: 'w21:t4', pane: 'w21:p4',
+      key: 'rpc-smoke', label: 'rpc-smoke', cwd: '/tmp/omodori/rpc-smoke', thread: null, workspace: 'w21', tab: 'w21:t4', pane: 'w21:p4',
       sessionId: LANE_ID, status: 'open', openedAt: '2026-10-23T07:07:47.150Z', generation: 4,
       ...(opts.endpointCache ? { endpoint: { kind: 'tui', socket: opts.endpointCache, instanceId: INST, seenAt: '' } } : {}),
     },
-    'dandori-lead-x': { key: 'dandori-lead-x', sessionId: 'lead-id', status: 'open', pane: 'wW:p6' },
+    'dori-lead-x': { key: 'dori-lead-x', sessionId: 'lead-id', status: 'open', pane: 'wW:p6' },
   } as any
   const deps: SupDeps = {
     home, now: () => clock.t,
@@ -101,11 +101,11 @@ const tuiSpec = (over: Partial<HostSpec> = {}): HostSpec => ({ kind: 'tui', stat
 const fileEvents = (home: string) => (existsSync(supPaths(home).events) ? readFileSync(supPaths(home).events, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
 const kinds = (home: string, kind: string) => fileEvents(home).filter((e) => e.kind === kind)
 
-const base = process.env.OMOCAT_HOME ?? mkdtempSync(join(tmpdir(), 'sup-test-'))
+const base = process.env.OMODORI_HOME ?? mkdtempSync(join(tmpdir(), 'sup-test-'))
 let n = 0
 let home = ''
 beforeEach(() => { home = join(base, `case-${++n}`); mkdirSync(home, { recursive: true }) })
-afterAll(() => { if (!process.env.OMOCAT_HOME) rmSync(base, { recursive: true, force: true }) })
+afterAll(() => { if (!process.env.OMODORI_HOME) rmSync(base, { recursive: true, force: true }) })
 
 async function replay(sup: Supervisor, link: MockLink, records: any[], epochAfterIdle?: number) {
   for (const r of records) {
@@ -151,7 +151,7 @@ describe('turn_done from recorded session_status sequences', () => {
 
 describe('children (S5)', () => {
   const child = (id: string, status: string, ctx: Record<string, unknown>, kind = 'worker') => ({
-    sessionId: `route-${id}`, durableSessionId: id, status, kind, cwd: '/tmp/omocat/rpc-smoke', context: ctx,
+    sessionId: `route-${id}`, durableSessionId: id, status, kind, cwd: '/tmp/omodori/rpc-smoke', context: ctx,
   })
   const hostWith = (snapshot: any[], over: Partial<HostSpec> = {}): HostSpec => ({ kind: 'rpc_host', state: 'up', instanceId: 'host-1', snapshot, epoch: 0, ...over })
   const laneOf = (sup: Supervisor) => (sup.snapshot() as any).lanes['rpc-smoke']
@@ -493,7 +493,7 @@ describe('observe-only contract', () => {
 })
 
 // ---------------------------------------------------------------------------------------------------------------------
-// S9 policies (fixtures). Every case runs in its own OMOCAT_HOME tree; nothing reaches a live lane.
+// S9 policies (fixtures). Every case runs in its own OMODORI_HOME tree; nothing reaches a live lane.
 
 const T0 = Date.parse('2026-10-23T08:00:00Z')
 const MIN = 60_000
@@ -512,7 +512,7 @@ const CLAUDE = 'anthropic-subscription/claude-opus-5-5'
 function writeMapFile(h: string, over: Record<string, unknown> = {}) {
   const m = {
     'rpc-smoke': {
-      key: 'rpc-smoke', label: 'rpc-smoke', cwd: '/tmp/omocat/rpc-smoke', thread: null, workspace: 'w21', tab: 'w21:t4', pane: 'w21:p4',
+      key: 'rpc-smoke', label: 'rpc-smoke', cwd: '/tmp/omodori/rpc-smoke', thread: null, workspace: 'w21', tab: 'w21:t4', pane: 'w21:p4',
       sessionId: LANE_ID, status: 'open', openedAt: '2026-10-23T07:07:47.150Z', generation: 4, model: CLAUDE, ...over,
     },
   }
@@ -706,7 +706,7 @@ describe('S9 session_replaced -> adopt', () => {
     patchMapFile(home, 'rpc-smoke', { sessionId: NEW_ID, generation: 5, sessionVia: 'adopt', seed: { state: 'pending', id: 'seed:rpc-smoke:5', generation: 5 } })
     const led = new OpsLedger(home, () => x.w.clock.t)
     const op = led.create('adopt', 'rpc-smoke', { from: LANE_ID, to: NEW_ID, via: 'registry' })
-    led.mark(op, 'attempted', 'rebound; seed pending', { step: 'seed', data: { ...op.data, g: 5, seedId: 'seed:rpc-smoke:5', cwd: '/tmp/omocat/rpc-smoke' } })
+    led.mark(op, 'attempted', 'rebound; seed pending', { step: 'seed', data: { ...op.data, g: 5, seedId: 'seed:rpc-smoke:5', cwd: '/tmp/omodori/rpc-smoke' } })
     const asked: string[] = []
     let n = 0
     const ctx = adoptCtx(home, x, (_p, id) => { asked.push(id); return ++n >= 3 ? 'persisted' : 'absent' }, {})
@@ -980,8 +980,8 @@ describe('late receipt: a delivery.uncertain whose message landed later is settl
     mkdirSync(join(home, 'events'), { recursive: true })
     writeFileSync(supPaths(home).events, readFileSync(join(FIX, 'late-receipt.events.ndjson'), 'utf8'))
   }
-  // acme-video is closed but keeps its sessionPath; find() is the fallback and must not be needed here.
-  const map = { 'acme-video': { key: 'acme-video', status: 'closed', cwd: '/x', sessionId: 'e22ac0b6-3e87-43a3-b95a-15b4596d9094', sessionPath: SESSION } } as any
+  // video-edit is closed but keeps its sessionPath; find() is the fallback and must not be needed here.
+  const map = { 'video-edit': { key: 'video-edit', status: 'closed', cwd: '/x', sessionId: 'e22ac0b6-3e87-43a3-b95a-15b4596d9094', sessionPath: SESSION } } as any
   const deps = { map: () => map, find: () => null, receipt }
   const persisted = () => readFileSync(supPaths(home).events, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((e) => e.kind === 'delivery.persisted')
 
@@ -990,7 +990,7 @@ describe('late receipt: a delivery.uncertain whose message landed later is settl
     expect(settleLateReceipts(home, NOW, deps)).toEqual(['a8e93692-ba5'])
     const late = persisted().filter((e) => e.data.late)
     expect(late.map((e) => [e.id, e.lane, e.data.id, e.data.late, e.data.uncertainAt])).toEqual([
-      ['delivery.persisted:a8e93692-ba5', 'acme-video', 'a8e93692-ba5', true, '2026-10-24T11:25:56.861Z'],
+      ['delivery.persisted:a8e93692-ba5', 'video-edit', 'a8e93692-ba5', true, '2026-10-24T11:25:56.861Z'],
     ])
   })
   test('idempotent across runs and restarts (the log is the only state)', () => {
@@ -1006,7 +1006,7 @@ describe('late receipt: a delivery.uncertain whose message landed later is settl
   })
   test('a replaced lane falls back to the event durableId session file', () => {
     seed()
-    const replaced = { 'acme-video': { ...map['acme-video'], sessionId: 'other', sessionPath: '/nope.jsonl' } }
+    const replaced = { 'video-edit': { ...map['video-edit'], sessionId: 'other', sessionPath: '/nope.jsonl' } }
     expect(settleLateReceipts(home, NOW, { map: () => replaced, find: (id: string) => (id === 'e22ac0b6-3e87-43a3-b95a-15b4596d9094' ? SESSION : null), receipt })).toEqual(['a8e93692-ba5'])
   })
 })

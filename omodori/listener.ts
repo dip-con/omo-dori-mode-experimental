@@ -2,6 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'nod
 import { DiscordBotClient, DiscordBotListener, DiscordIntent } from 'agent-messenger/discordbot'
 import type { DiscordGatewayMessageCreateEvent } from 'agent-messenger/discordbot'
 import { type Deps as ButtonDeps, type Interaction, Store, discordRest, handleInteraction, handleOwnerText, herdrCli, pollRelayOnce } from './buttons'
+import { doriHome, cfg } from './config'
 
 type Message = { id: string }
 type FetchPage<M extends Message> = (query: { limit: number; after?: string }) => Promise<M[]>
@@ -90,8 +91,8 @@ if (import.meta.main) {
   const { cfg } = await import('./config')
   const OWNER_ID = cfg.discord.ownerId
   const GUILD_ID = cfg.discord.guildId
-  const INBOX = `${HOME}/.omocat/inbox.jsonl`
-  const CHANNELS = `${HOME}/.omocat/channels.json`
+  const INBOX = `${doriHome()}/inbox.jsonl`
+  const CHANNELS = `${doriHome()}/channels.json`
 
   type Project = { key: string; name: string; path: string; repo: string }
   const parentByChannel = new Map<string, string | null>()
@@ -108,7 +109,7 @@ if (import.meta.main) {
   }
 
   const creds = JSON.parse(readFileSync(`${HOME}/.config/agent-messenger/discordbot-credentials.json`, 'utf8'))
-  const client = await new DiscordBotClient().login({ token: creds.bots.omocat.token })
+  const client = await new DiscordBotClient().login({ token: creds.bots[cfg.discord.botName].token })
   const listener = new DiscordBotListener(client, {
     intents:
       DiscordIntent.Guilds |
@@ -122,7 +123,7 @@ if (import.meta.main) {
   const emit = (kind: string, payload: Record<string, unknown>) => {
     const line = JSON.stringify({ at: new Date().toISOString(), kind, ...payload })
     appendFileSync(INBOX, line + '\n')
-    console.log(`OMOCAT_${kind} ${line}`)
+    console.log(`OMODORI_${kind} ${line}`)
   }
 
   const buttons: ButtonDeps = {
@@ -148,7 +149,7 @@ if (import.meta.main) {
   // Voice messages (and any audio attachment) are transcribed locally with mlx-whisper;
   // the transcript is treated as the message text.
   const MLX_WHISPER = `${HOME}/.local/bin/mlx_whisper`
-  const VOICE_DIR = `${HOME}/.omocat/voice`
+  const VOICE_DIR = `${doriHome()}/voice`
   const transcribe = async (url: string, id: string): Promise<string> => {
     mkdirSync(VOICE_DIR, { recursive: true })
     const audio = `${VOICE_DIR}/${id}.ogg`
@@ -157,7 +158,7 @@ if (import.meta.main) {
     await Bun.write(audio, await res.arrayBuffer())
     const proc = Bun.spawn(
       [MLX_WHISPER, audio, '--model', 'mlx-community/whisper-large-v3-turbo', '--output-format', 'txt', '--output-dir', VOICE_DIR, '--verbose', 'False',
-       '--initial-prompt', '오모냥, 받아쓰기, 테스트, 확인해줘, 알려줘, 깃랩, 디스코드'],
+       '--initial-prompt', cfg.voice.initialPrompt || [...cfg.bots.map((b) => b.name), '받아쓰기', '테스트', '확인해줘', '알려줘', '깃랩', '디스코드'].join(', ')],
       { stdout: 'ignore', stderr: 'pipe' },
     )
     const [err, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited])
@@ -194,7 +195,7 @@ if (import.meta.main) {
     const ref = m.message_reference as { type?: number; message_id?: string } | undefined
     const snapshots = (m as unknown as { message_snapshots?: { message: { content?: string } }[] }).message_snapshots
     const forwarded = ref?.type === 1 ? (snapshots ?? []).map((s) => s.message?.content ?? '').join('\n') : null
-    // A pending "직접 입력" turns the owner's next message in that channel into the answer (OMOCAT_BUTTON).
+    // A pending "직접 입력" turns the owner's next message in that channel into the answer (OMODORI_BUTTON).
     if (m.author.id === OWNER_ID && (await handleOwnerText(m.channel_id, m.content || voice?.transcript || '', m.id, buttons))) {
       appendFileSync(INBOX, JSON.stringify({ at: new Date().toISOString(), kind: 'CURSOR', id: m.id, channel_id: m.channel_id }) + '\n')
       return
@@ -243,14 +244,14 @@ if (import.meta.main) {
       const fetchTracked: typeof fetchPage = (q) => fetchPage(q).catch((err) => { fetchErrors.add(err); throw err })
       try {
         await catchUpChannel(fetchTracked, cursors.get(channelId) ?? null, catchUpStates, channelId, handle, (gap) =>
-          console.log(`OMOCAT_ERROR catch-up gap ${channelId}: ${gap}`))
+          console.log(`OMODORI_ERROR catch-up gap ${channelId}: ${gap}`))
       } catch (err) {
         // An emit failure is not a fetch failure: seen holds before that message, and the run stops as before.
         if (!fetchErrors.has(err)) throw err
 
         // One deleted or inaccessible channel must not stop catch-up for every other channel.
         // Periodic runs report a failing channel once, not every round.
-        if (!periodic || !failingChannels.has(channelId)) console.log(`OMOCAT_ERROR catch-up skipped ${channelId}: ${(err as Error).message}`)
+        if (!periodic || !failingChannels.has(channelId)) console.log(`OMODORI_ERROR catch-up skipped ${channelId}: ${(err as Error).message}`)
         failingChannels.add(channelId)
         if (/Unknown Channel|Missing Access/.test((err as Error).message)) {
           book.cursors.delete(channelId)
@@ -265,7 +266,7 @@ if (import.meta.main) {
   let catchingUp: Promise<void> | null = null
   const runCatchUp = (periodic: boolean) => {
     catchingUp ??= catchUpMissed(periodic)
-      .catch((err) => console.log(`OMOCAT_ERROR catch-up failed: ${err.message}`))
+      .catch((err) => console.log(`OMODORI_ERROR catch-up failed: ${err.message}`))
       .finally(() => { catchingUp = null })
     return catchingUp
   }
@@ -274,7 +275,7 @@ if (import.meta.main) {
   let announcedReady = false
   setInterval(() => {
     if (disconnectedSince !== null && Date.now() - disconnectedSince > 120_000) {
-      console.log(`OMOCAT_ERROR gateway disconnected for ${Math.round((Date.now() - disconnectedSince) / 1000)}s`)
+      console.log(`OMODORI_ERROR gateway disconnected for ${Math.round((Date.now() - disconnectedSince) / 1000)}s`)
       disconnectedSince = Date.now()
     }
   }, 30_000)
@@ -286,25 +287,25 @@ if (import.meta.main) {
   listener.on('connected', ({ user }) => {
     botId = user.id
     disconnectedSince = null
-    console.log(`${announcedReady ? 'omocat-reconnected' : 'OMOCAT_READY'} ${user.username} ${user.id}`)
+    console.log(`${announcedReady ? 'omodori-reconnected' : 'OMODORI_READY'} ${user.username} ${user.id}`)
     announcedReady = true
     void runCatchUp(false)
   })
   listener.on('message_create', (m) => {
-    emitMessage(m, false).catch((err) => console.log(`OMOCAT_ERROR message handling failed: ${err.message}`))
+    emitMessage(m, false).catch((err) => console.log(`OMODORI_ERROR message handling failed: ${err.message}`))
   })
   listener.on('interaction_create', (ev) => {
-    handleInteraction(ev as unknown as Interaction, buttons).catch((err) => console.log(`OMOCAT_ERROR button handling failed: ${err.message}`))
+    handleInteraction(ev as unknown as Interaction, buttons).catch((err) => console.log(`OMODORI_ERROR button handling failed: ${err.message}`))
   })
   // The Discord app's Interactions Endpoint is pr-board, so button presses arrive through its relay.
   const relayLoop = async () => {
     let backoff = 1000
     for (;;) {
       try {
-        await pollRelayOnce(buttons, { key: readFileSync(`${HOME}/.omocat/prb-admin-key.txt`, 'utf8').trim() })
+        await pollRelayOnce(buttons, { key: readFileSync(`${doriHome()}/prb-admin-key.txt`, 'utf8').trim() })
         backoff = 1000
       } catch (err) {
-        console.log(`OMOCAT_ERROR relay ${(err as Error).message} (retry in ${backoff / 1000}s)`)
+        console.log(`OMODORI_ERROR relay ${(err as Error).message} (retry in ${backoff / 1000}s)`)
         await Bun.sleep(backoff)
         backoff = Math.min(backoff * 2, 30_000)
       }
@@ -314,9 +315,9 @@ if (import.meta.main) {
   listener.on('guild_member_add', (e) => emit('MEMBER_JOIN', { guild_id: e.guild_id, user: e.user }))
   listener.on('disconnected', () => {
     disconnectedSince ??= Date.now()
-    console.log('omocat-disconnected')
+    console.log('omodori-disconnected')
   })
-  listener.on('error', (err) => console.log(`OMOCAT_ERROR ${err.message}`))
+  listener.on('error', (err) => console.log(`OMODORI_ERROR ${err.message}`))
 
   await listener.start()
 }

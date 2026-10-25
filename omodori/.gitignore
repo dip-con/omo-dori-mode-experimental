@@ -38,17 +38,17 @@ ledger.json
 ledger.json.*.tmp
 lane-migrations.jsonl
 
-# dori-redesign supervisor runtime state
+# supervisor runtime state
 events/
 state/
 flags/
 lane-status.json
 
-# dori-redesign S7 kakao queue db
+# S7 kakao queue db
 kakao-queue.sqlite
 kakao-queue.sqlite-*
 
-# dori-redesign S8 runtime ledgers
+# S8 runtime ledgers
 ops/
 lane-transitions.jsonl
 handoffs/

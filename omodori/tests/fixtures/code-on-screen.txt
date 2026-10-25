@@ -1,4 +1,4 @@
- ╭─ read ~/.omocat/herdr-watch.ts
+ ╭─ read ~/.omodori/herdr-watch.ts
  │ 19  // so also look at the screen for the ask-user prompt.
  │ 20  const QUESTION_UI = /Ask user · |Submit \(\d+\/\d+ answered\)|↑↓ move .*select/
  │ 21  const asking = new Set<string>()
@@ -17,5 +17,5 @@
 ── • Running eval (24s • esc to interrupt) ──────────────────────────────────────────
 ❯
 ─────────────────────────────────────────────────────────────────────────────────────
-~/.omocat • 152K/1M (15.2%) (auto)    (anthropic-subscription) claude-opus-5-5:medium
-(😺 OmO Native by Q Kim) Pursuing goal (3m) mem:omocat-eb85c2c5 15h ago Claude 92/...
+~/.omodori • 152K/1M (15.2%) (auto)    (anthropic-subscription) claude-opus-5-5:medium
+(😺 OmO Native by Q Kim) Pursuing goal (3m) mem:omodori-eb85c2c5 15h ago Claude 92/...

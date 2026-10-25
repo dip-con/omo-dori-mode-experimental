@@ -1,5 +1,5 @@
 // Regression tests for the "gone" event: on 2026-10-23T04:07Z herdr-watch fired
-// OMOCAT_HERDR {"event":"gone","pane":"w1W:p3","session":"dori-improve"} while the pane was alive
+// OMODORI_HERDR {"event":"gone","pane":"w1W:p3","session":"dori-improve"} while the pane was alive
 // and working. `herdr agent list` only lists panes whose agent it has detected, so a single poll
 // can omit a live pane (agent restarting / not yet re-detected); gone must be confirmed by two
 // consecutive successful listings that both miss the pane.
@@ -8,14 +8,14 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 
 // herdr-watch opens the buttons DB at import time; keep it out of the live database.
-const dir = mkdtempSync(`${tmpdir()}/omocat-herdr-watch-`)
-const prevDb = process.env.OMOCAT_BUTTONS_DB
-process.env.OMOCAT_BUTTONS_DB = `${dir}/buttons.db`
+const dir = mkdtempSync(`${tmpdir()}/omodori-herdr-watch-`)
+const prevDb = process.env.OMODORI_BUTTONS_DB
+process.env.OMODORI_BUTTONS_DB = `${dir}/buttons.db`
 const { confirmGone, GONE_MISS_LIMIT } = await import('../herdr-watch')
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true })
-  if (prevDb === undefined) delete process.env.OMOCAT_BUTTONS_DB
-  else process.env.OMOCAT_BUTTONS_DB = prevDb
+  if (prevDb === undefined) delete process.env.OMODORI_BUTTONS_DB
+  else process.env.OMODORI_BUTTONS_DB = prevDb
 })
 
 const lane = [{ key: 'dori-improve', pane: 'w1W:p3' }]

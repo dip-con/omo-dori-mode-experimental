@@ -1,10 +1,10 @@
-// Question parsing and Discord button layout for OmOMeow.
+// Question parsing and Discord button layout for the lead.
 //
 // Ported from kihyunnn/omo-discord-question-patch (MIT License, Copyright (c) kihyunnn):
 //   src/questions.ts   -> fromJson / dedupeQuestions / parsePaneQuestions / parseSessionQuestionCalls
 //   src/discord.ts     -> row packing (5 buttons per row) and message chunking (5 rows per message)
 //   src/session-log.ts / src/session-lookup.ts -> agent-dir resolution, cwd slug, bounded tail read
-// Changes for OmOMeow:
+// Changes for Dori:
 //   - the open question is the newest ask_user_question call WITHOUT a matching toolResult
 //     (the repo used "newest call"; OMO logs the result, so answered/cancelled is known exactly)
 //   - options keep their description; custom_id carries our question id (`oq|<id>|<qi>|<choice>`)

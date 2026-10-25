@@ -1,4 +1,4 @@
-// 답장(reply) context for the lanes (Dandori 10-23): a reply like "이거 PDF로" must say which message it answers.
+// 답장(reply) context for the lanes (lead 10-23): a reply like "이거 PDF로" must say which message it answers.
 // kakao-loco.ts writes reply_to_log_id / reply_to_text (addressingFields). Kakao truncates the quoted text and the
 // ids it hands over may have lost precision (JS numbers above 2^53), so the original is looked up in the local kka
 // archive (read-only) by chat + log id, falling back to the quoted text when the archive does not have it.

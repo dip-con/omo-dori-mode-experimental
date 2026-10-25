@@ -7,7 +7,9 @@
     ],
     "wakeFilter": true,
     "pinned": true,
-    "note": "주인과 둘이 쓰는 방. 주인 말은 전부 너에게 하는 말이다."
+    "note": "주인과 둘이 쓰는 방. 주인 말은 전부 너에게 하는 말이다.",
+    "noJev": true,
+    "maskPii": true
   },
   "480000000000003": {
     "name": "주인 1:1",
@@ -19,12 +21,13 @@
     "wakeFilter": false
   },
   "18000000000000003": {
-    "name": "가족방",
-    "lane": "kakao-family",
+    "name": "모임방",
+    "lane": "kakao-chat",
     "owner": [
       "5900000000000000001"
     ],
     "ownerFix": true,
-    "wakeFilter": true
+    "wakeFilter": true,
+    "replyRefs": true
   }
 }

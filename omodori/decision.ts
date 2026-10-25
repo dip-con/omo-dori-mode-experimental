@@ -10,6 +10,7 @@ import { CATEGORIES, type Category, type Decision, HOLD, add, ageDays, autoDefau
 import { DORI, INBOX, flag, kst, opt, post, readJson, writeJson } from './dori-lib'
 import { morning, morningAck } from './heartbeat'
 import { brief as ledgerBrief, load as loadLedger } from './ledger'
+import { cfg } from './config'
 
 const STATE = `${DORI}/heartbeat/decisions-state.json`
 const SLOTS = [{ h: 8, m: 30, name: 'am' }, { h: 21, m: 0, name: 'pm' }] as const
@@ -31,7 +32,7 @@ async function sync(): Promise<string[]> {
         const label = answerLabel(a.questions[0]!, ans)
         d.askId = undefined
         d.updated = new Date().toISOString()
-        if (label === HOLD) { d.held = true; notes.push(`${d.id} 형이 보류`); continue }
+        if (label === HOLD) { d.held = true; notes.push(`${d.id} ${cfg.owner.title} 보류`); continue }
         d.status = 'resolved'; d.answer = label; d.resolvedBy = 'owner'; d.resolvedAt = d.updated
         notes.push(`${d.id} → ${label}`)
         continue

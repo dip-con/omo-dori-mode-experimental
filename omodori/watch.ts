@@ -1,7 +1,8 @@
 import { $ } from 'bun'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { doriHome } from './config'
 
-const STATE_PATH = `${process.env.HOME}/.omocat/watch-state.json`
+const STATE_PATH = `${doriHome()}/watch-state.json`
 const MAIL_FILTER = 'is:unread newer_than:2d (is:important OR category:primary OR from:kakaoimpact.org) -from:tradingview.com'
 const SOON_MINUTES = 15
 const TRAVEL_LEAD_MINUTES = 60
@@ -10,7 +11,7 @@ const BRIEF_AT = { hour: 8, minute: 30 }
 type Item = Record<string, unknown> & { id: string }
 type State = { mailSeen: string[]; calSeen: string[]; calAlerted: string[]; lastBrief: string; seoDue?: Record<string, string> }
 type SeoSite = { key: string; url: string; weekday: number; hour: number; paused?: string }
-const SEO_SITES_PATH = `${process.env.HOME}/.omocat/seo-sites.json`
+const SEO_SITES_PATH = `${doriHome()}/seo-sites.json`
 
 const today = () => new Date().toLocaleDateString('sv-SE')
 const isBaseline = !existsSync(STATE_PATH)
@@ -24,7 +25,7 @@ const saveState = () => {
   writeFileSync(STATE_PATH, JSON.stringify(state))
 }
 
-const emit = (kind: string, payload: unknown) => console.log(`OMOCAT_${kind} ${JSON.stringify(payload)}`)
+const emit = (kind: string, payload: unknown) => console.log(`OMODORI_${kind} ${JSON.stringify(payload)}`)
 
 const zeleItems = async (args: string[]): Promise<Item[] | null> => {
   const res = await $`zele ${args}`.quiet().nothrow()

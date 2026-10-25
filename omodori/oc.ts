@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs'
+import { doriHome, cfg } from './config'
 
 const creds = JSON.parse(
   readFileSync(`${process.env.HOME}/.config/agent-messenger/discordbot-credentials.json`, 'utf8'),
 )
 const headers = {
-  Authorization: `Bot ${creds.bots.omocat.token}`,
+  Authorization: `Bot ${creds.bots[cfg.discord.botName].token}`,
   'Content-Type': 'application/json',
-  'User-Agent': 'DiscordBot (omocat, 1.0)',
+  'User-Agent': 'DiscordBot (omodori, 1.0)',
 }
 const api = (path: string, body?: unknown) =>
   fetch(`https://discord.com/api/v10${path}`, {
@@ -78,7 +79,7 @@ switch (cmd) {
     // done <channel> <message>: remove the 👀 reaction (and stop any leftover typing loop from older versions).
     const [ch, msg] = args
     const { existsSync, readFileSync, rmSync } = await import('node:fs')
-    const pidFile = `${process.env.HOME}/.omocat/typing/${ch}.pid`
+    const pidFile = `${doriHome()}/typing/${ch}.pid`
     if (existsSync(pidFile)) {
       try { process.kill(Number(readFileSync(pidFile, 'utf8'))) } catch { /* already gone */ }
       rmSync(pidFile, { force: true })
@@ -128,7 +129,7 @@ switch (cmd) {
       console.error('usage: oc.ts say <text...>')
       process.exit(2)
     }
-    const res = await fetch(`http://127.0.0.1:${process.env.OMOCAT_VOICE_PORT ?? 47820}/say`, {
+    const res = await fetch(`http://127.0.0.1:${process.env.OMODORI_VOICE_PORT ?? 47820}/say`, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       body: text,
@@ -138,7 +139,7 @@ switch (cmd) {
     break
   }
   case 'ask': {
-    // ask <channel> <question> <option...> [--multi] [--other]: buttons; presses arrive as OMOCAT_BUTTON from listener.ts.
+    // ask <channel> <question> <option...> [--multi] [--other]: buttons; presses arrive as OMODORI_BUTTON from listener.ts.
     const { Store, discordRest, herdrCli, newAsk, publish } = await import('./buttons')
     const flags = new Set(args.filter((a) => a === '--multi' || a === '--other'))
     const [channel, question, ...labels] = args.filter((a) => a !== '--multi' && a !== '--other')

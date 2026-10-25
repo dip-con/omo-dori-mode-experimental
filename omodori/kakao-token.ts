@@ -1,4 +1,4 @@
-// Access-token refresh for 장도리's KakaoTalk account (10-22, 주인 승인).
+// Access-token refresh for the bot's KakaoTalk account (10-22, 주인 승인).
 // The LOCO server ends a session every 72 h; kakao-loco then exits and logs in again, and that LOGINLIST fails with -950
 // once the access token has expired (10-14, 10-22: a token 4.6 days old reconnected, 7.6 days old did not).
 // agent-messenger ships refreshKakaoOAuthToken but never calls it. This module renews the token with the saved refresh
@@ -9,8 +9,9 @@
 // Manual run: `bun kakao-token.ts refresh` (prints the new lifetime only).
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { KakaoCredentialManager, KakaoOAuthRefreshError, refreshKakaoOAuthToken } from 'agent-messenger/kakaotalk'
+import { kakaoLogs } from './config'
 
-const LOGS = process.env.DANDORI_KAKAO_LOGS || `${process.env.HOME}/Library/Logs/dandori-kakao`
+const LOGS = kakaoLogs()
 export const AUTH_RETRY_MS = 60_000
 // Without a known lifetime (token from a password login), refresh once it is 2 days old: 4.6 days still worked.
 const DEFAULT_REFRESH_AFTER_MS = 2 * 86_400_000

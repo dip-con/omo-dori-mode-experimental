@@ -1,15 +1,16 @@
-// Builds per-person chat-habit notes for the 장도리 group rooms from the last 400 messages of each room.
-// kakao-push.ts attaches the note of everyone in a batch, so 장도리 answers each person in their own way.
-// Run by jangdori-restart.sh (05:00 / 15:00) before the lane restarts; `bun kakao-people.ts` refreshes by hand.
+// Builds per-person chat-habit notes for the bot's group rooms from the last 400 messages of each room.
+// kakao-push.ts attaches the note of everyone in a batch, so the bot answers each person in their own way.
+// Run before a lane restart (for example from lane-restart.sh); `bun kakao-people.ts` refreshes by hand.
 import { readFileSync, writeFileSync, renameSync } from 'node:fs'
-import { cfg } from './config'
+import { cfg, doriHome, botForLane } from './config'
 
 type Room = { name: string; owner: string[]; ownerOnly?: boolean; pinned?: boolean }
 type Person = { name: string; note: string; seenAt: string }
 const HOME = process.env.HOME!
-const OUT = `${HOME}/.omocat/sa-cache/kakao-people.json`
-const ROOMS: Record<string, Room> = JSON.parse(readFileSync(`${HOME}/.omocat/kakao-rooms.json`, 'utf8'))
+const OUT = `${doriHome()}/sa-cache/kakao-people.json`
+const ROOMS: Record<string, Room> = JSON.parse(readFileSync(`${doriHome()}/kakao-rooms.json`, 'utf8'))
 const BOTS = new Set(['오픈채팅봇'])
+const BOT_NAME = botForLane('').name
 const kst = (t: string) => new Date(Date.parse(t) + 9 * 3600_000).toISOString().slice(5, 16).replace('T', ' ')
 
 const lines: string[] = []
@@ -20,7 +21,7 @@ for (const [chat, room] of Object.entries(ROOMS)) {
   const ms = (await (await fetch(`http://127.0.0.1:${cfg.kakao.locoPort}/messages?chat=${chat}&count=400`, { signal: AbortSignal.timeout(30_000) })).json()) as any[]
   lines.push(`## ${room.name}`)
   for (const m of [...ms].reverse()) {
-    const name = m.is_from_me ? '장도리' : owners.has(m.sender_id) ? '주인(주인)' : (m.sender ?? m.sender_id)
+    const name = m.is_from_me ? BOT_NAME : owners.has(m.sender_id) ? '주인(주인)' : (m.sender ?? m.sender_id)
     lines.push(`${kst(m.timestamp)} ${name}: ${m.photo_url ? '[사진]' : String(m.text ?? '').replace(/\n/g, ' / ').slice(0, 200)}`)
     if (m.is_from_me || owners.has(m.sender_id) || BOTS.has(name)) continue
     const c = counts.get(m.sender_id) ?? { name, n: 0 }
@@ -33,8 +34,8 @@ if (!targets.length) process.exit(0)
 
 const prompt = `아래는 카카오톡 단톡방 대화 기록이다. 각 사람의 대화 패턴을 메모해라.
 대상(아이디: 닉네임): ${targets.map(([id, c]) => `${id}: ${c.name}`).join(', ')}
-사람마다 한국어 한두 문장, 100자 이내로 그 사람에 대한 사실만: 말투, 자주 쓰는 말이나 드립, 관심사(게임·취미 등), 장도리(봇)를 대하는 태도(놀리는지, 자주 부르는지, 뭘 시키는지, 호칭을 바꾸라고 했는지).
-장도리가 어떻게 말해야 한다는 조언(존댓말, 정중하게, 따뜻하게, 맞춰주기 등)은 쓰지 마라. 장도리 말투는 따로 정해져 있다.
+사람마다 한국어 한두 문장, 100자 이내로 그 사람에 대한 사실만: 말투, 자주 쓰는 말이나 드립, 관심사(게임·취미 등), ${BOT_NAME}(봇)를 대하는 태도(놀리는지, 자주 부르는지, 뭘 시키는지, 호칭을 바꾸라고 했는지).
+${BOT_NAME}가 어떻게 말해야 한다는 조언(존댓말, 정중하게, 따뜻하게, 맞춰주기 등)은 쓰지 마라. ${BOT_NAME} 말투는 따로 정해져 있다.
 대화에서 보이는 것만 쓰고 추측하지 마라. 실명, 주소, 연락처, 직장, 나이, 건강, 가족, 결혼·연애 같은 사생활은 쓰지 마라.
 출력은 JSON 하나만: {"<아이디>": "<메모>", ...}
 

@@ -1,28 +1,29 @@
-// Tools for the 장도리 KakaoTalk lane. The lane is started with
+// Tools for a KakaoTalk lane (the bot named in config.json bots[]). The lane is started with
 // `--tools kakao_send,kakao_recent,web_search` so these are its only ways to act:
 // it can talk in its one room and search the web, but cannot run commands or touch files.
 // kakao-push.ts records which room the lane's latest batch came from; every send and read goes to that room.
-import { cfg, omocatHome } from './config'
-const ROOM_CONFIG: Record<string, { name: string }> = (() => { try { return JSON.parse(require('node:fs').readFileSync(`${omocatHome()}/kakao-rooms.json`, 'utf8')) } catch { return {} } })()
+import { cfg, doriHome, botForLane } from './config'
+const ROOM_CONFIG: Record<string, { name: string }> = (() => { try { return JSON.parse(require('node:fs').readFileSync(`${doriHome()}/kakao-rooms.json`, 'utf8')) } catch { return {} } })()
 const CHAT_IDS: Record<string, string> = Object.fromEntries(Object.entries(ROOM_CONFIG).map(([id, r]) => [r.name, id]))
 const ROOMS = Object.keys(CHAT_IDS)
-// Redesign S7: with OMOMEOW_LANE_KEY the room is the lane's own sa-cache/room.<lane> (a chat id kakao-push writes once),
+// Redesign S7: with OMODORI_LANE_KEY the room is the lane's own sa-cache/room.<lane> (a chat id kakao-push writes once),
 // so a late kakao_send still goes to this lane's room after another lane got a batch. Without it: the shared legacy file.
-export function roomName(env: Record<string, string | undefined> = process.env, dir = `${env.OMOCAT_HOME ?? `${env.HOME}/.omocat`}/sa-cache`, config: Record<string, { name: string }> = ROOM_CONFIG): string | undefined {
+export function roomName(env: Record<string, string | undefined> = process.env, dir = `${env.OMODORI_HOME ?? doriHome()}/sa-cache`, config: Record<string, { name: string }> = ROOM_CONFIG): string | undefined {
   const names = Object.values(config).map((r) => r.name)
-  if (env.JANGDORI_ROOM) return env.JANGDORI_ROOM
+  if (env.OMODORI_ROOM) return env.OMODORI_ROOM
   const fs = require('node:fs')
-  const lane = env.OMOMEOW_LANE_KEY
+  const lane = env.OMODORI_LANE_KEY
   if (lane && /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/.test(lane)) {
     try { const id = fs.readFileSync(`${dir}/room.${lane}`, 'utf8').trim(); if (config[id]) return config[id]!.name } catch {}
   }
-  try { const r = fs.readFileSync(`${dir}/jangdori-room`, 'utf8').trim(); if (names.includes(r)) return r } catch {}
+  try { const r = fs.readFileSync(`${dir}/active-room`, 'utf8').trim(); if (names.includes(r)) return r } catch {}
   return names[0]
 }
 const room = () => roomName()!
 
-const LOCO = process.env.JANGDORI_LOCO ?? `http://127.0.0.1:${cfg.kakao.locoPort}`
+const LOCO = process.env.OMODORI_LOCO ?? `http://127.0.0.1:${cfg.kakao.locoPort}`
 const BOT = cfg.kakao.botUserId
+const SELF = `${botForLane(process.env.OMODORI_LANE_KEY ?? '').name}(나)`
 
 // Kakao goes through kakao-loco.ts (the one LOCO session); args keep the kakaocli shape: send <room> <text> | messages ... --chat <room> --limit <n>.
 async function run(args: string[]) {
@@ -37,8 +38,8 @@ async function run(args: string[]) {
   }
 }
 
-const IMG_DIR = '/tmp/jangdori-img'
-const REPLY_REFS = `${process.env.HOME}/.omocat/sa-cache/reply-refs.json`
+const IMG_DIR = '/tmp/omodori-img'
+const REPLY_REFS = `${doriHome()}/sa-cache/reply-refs.json`
 
 const sentFiles = new Map<string, number>()
 
@@ -66,7 +67,7 @@ async function stageImage(source: string): Promise<string> {
   } else {
     const r = await sh(['realpath', source], 5000)
     if (r.code !== 0) throw new Error(`file not found: ${source} (use the exact path the image tool reported)`)
-    const allowed = ['/private/tmp/jangdori-img/', `${IMG_DIR}/`, cfg.kakao.generatedImagesDir, `${omocatHome()}/sa-cache/`]
+    const allowed = ['/private/tmp/omodori-img/', `${IMG_DIR}/`, cfg.kakao.generatedImagesDir, `${doriHome()}/sa-cache/`]
     if (!allowed.some((d) => r.text.startsWith(d))) throw new Error(`only generated images or files in ${IMG_DIR} can be sent`)
     file = r.text
     // Re-sending one local file is how the lane loops on a failed generation; refuse it for 10 minutes.
@@ -102,7 +103,7 @@ async function sendImage(source: string) {
 }
 
 // Original documents (주인 10-16): only files the doc-templates generator wrote under DOC_OUT may leave as a Kakao file message.
-const DOC_OUT = cfg.kakao.docOutDir
+const DOC_OUT = cfg.kakao.docOutDir || `${doriHome()}/doc-out/`
 async function sendDocFile(path: string, name?: string) {
   try {
     let real: string
@@ -135,7 +136,7 @@ export default function (pi: any) {
         const m = photos[Math.max(0, Math.floor(params.back ?? 0))]
         if (!m) return { content: [{ type: 'text', text: '최근 400개 메시지에 사진 없음' }], details: {} }
         const data = await imageBase64(m.photo_url)
-        const who = m.is_from_me ? '장도리(나)' : (m.sender ?? m.sender_id)
+        const who = m.is_from_me ? SELF : (m.sender ?? m.sender_id)
         return { content: [{ type: 'text', text: `${who}가 ${m.timestamp}에 올린 사진${m.part}` }, { type: 'image', data, mimeType: 'image/jpeg' }], details: {} }
       } catch (e) {
         return { content: [{ type: 'text', text: `사진 보기 실패: ${(e as Error).message}` }], details: {} }
@@ -159,14 +160,14 @@ export default function (pi: any) {
         const host = new URL(m.file_url).hostname
         if (!/(^|\.)kakaocdn\.net$|(^|\.)kakao\.com$/.test(host)) throw new Error(`unexpected file host ${host}`)
         // Saved under DOC_OUT/received so an edited copy next to it can go back out through kakao_send_file.
-        const dir = `${process.env.JANGDORI_FILE_DIR ?? `${DOC_OUT}received`}/${room().replace(/[^\w가-힣-]+/g, '_')}`
+        const dir = `${process.env.OMODORI_FILE_DIR ?? `${DOC_OUT}received`}/${room().replace(/[^\w가-힣-]+/g, '_')}`
         await sh(['mkdir', '-p', dir], 5000)
         const safe = String(m.file_name).replace(/[\/\\:\0]/g, '_').slice(-180)
         const file = `${dir}/${m.timestamp.replace(/[:.]/g, '-')}_${safe}`
         const dl = await sh(['curl', '-fsSL', '--max-time', '120', '--max-filesize', String(300 * 1024 * 1024), '-o', file, m.file_url], 130_000)
         if (dl.code !== 0) throw new Error(`download failed: ${dl.text.slice(-200)}`)
         const size = Bun.file(file).size
-        const who = m.is_from_me ? '장도리(나)' : (m.sender ?? m.sender_id)
+        const who = m.is_from_me ? SELF : (m.sender ?? m.sender_id)
         return { content: [{ type: 'text', text: `${who}가 ${m.timestamp}에 올린 파일 "${m.file_name}" (${size} bytes)을 받음: ${file}\n원본은 그대로 두고, 수정본은 같은 폴더에 새 이름으로 만든 뒤 kakao_send_file로 보내.` }], details: { path: file, name: m.file_name, size } }
       } catch (e) {
         return { content: [{ type: 'text', text: `파일 받기 실패: ${(e as Error).message}` }], details: {} }
@@ -174,13 +175,13 @@ export default function (pi: any) {
     },
   })
   pi.registerTool({
-    name: 'jangdori_fix_request',
-    label: 'Jangdori fix request',
-    description: '주인 본계정(주인님(주인))이 이 방에서 장도리 자체를 고치라고 할 때(말투·지침 수정, 장도리 도구 버그)만 부른다. 주인의 원래 메시지를 그대로 Dandori에게 넘긴다. 다른 사람 부탁에는 부르지 마라(어차피 거절됨).',
+    name: 'bot_fix_request',
+    label: 'Bot fix request',
+    description: `주인 본계정(주인님(주인))이 이 방에서 봇 자체를 고치라고 할 때(말투·지침 수정, 봇 도구 버그)만 부른다. 주인의 원래 메시지를 그대로 ${cfg.lead.name}에게 넘긴다. 다른 사람 부탁에는 부르지 마라(어차피 거절됨).`,
     parameters: { type: 'object', properties: {} },
     async execute() {
       // Forward only what kakao-push recorded from the owner's account in this room, verbatim (see recordOwnerFix).
-      const file = process.env.OWNER_FIX_FILE ?? `${process.env.HOME}/.omocat/sa-cache/owner-fix-requests.json`
+      const file = process.env.OWNER_FIX_FILE ?? `${doriHome()}/sa-cache/owner-fix-requests.json`
       const fs = require('node:fs')
       let list: { at: number; text: string; forwarded?: boolean }[] = []
       try { list = JSON.parse(fs.readFileSync(file, 'utf8')) } catch {}
@@ -188,17 +189,17 @@ export default function (pi: any) {
       const fresh = list.filter((e) => !e.forwarded && now - e.at <= 10 * 60_000 && e.at <= now + 60_000)
       if (!fresh.length) return { content: [{ type: 'text', text: '거절: 최근 10분 안에 주인 본계정의 수정 지시가 없음(다른 사람 부탁은 못 넘김)' }], details: { code: 1 } }
       // redesign S9: the lead hears this through the event router (DORI_ASK), never by typing into its pane.
-      const msg = `[카톡방 주인 장도리 수정요청] ${fresh.map((e) => e.text).join(' / ')}`
-      const events = `${process.env.OMOCAT_HOME ?? `${process.env.HOME}/.omocat`}/events/supervisor.ndjson`
+      const msg = `[카톡방 주인 봇 수정요청] ${fresh.map((e) => e.text).join(' / ')}`
+      const events = `${doriHome()}/events/supervisor.ndjson`
       try {
         fs.mkdirSync(require('node:path').dirname(events), { recursive: true })
-        fs.appendFileSync(events, `${JSON.stringify({ v: 2, at: new Date(now).toISOString(), id: `kakao.owner_fix_request:${now}`, kind: 'kakao.owner_fix_request', severity: 'ask', lane: process.env.OMOMEOW_LANE_KEY ?? 'jangdori', source: 'kakao', data: { text: msg } })}\n`, { mode: 0o600 })
+        fs.appendFileSync(events, `${JSON.stringify({ v: 2, at: new Date(now).toISOString(), id: `kakao.owner_fix_request:${now}`, kind: 'kakao.owner_fix_request', severity: 'ask', lane: process.env.OMODORI_LANE_KEY ?? 'kakao', source: 'kakao', data: { text: msg } })}\n`, { mode: 0o600 })
       } catch (e) {
         return { content: [{ type: 'text', text: `전달 실패: ${(e as Error).message.slice(-200)}` }], details: { code: 1 } }
       }
       for (const e of fresh) e.forwarded = true
       fs.writeFileSync(file, JSON.stringify(list))
-      return { content: [{ type: 'text', text: `Dandori에게 넘김(${fresh.length}건). 방에는 "접수했어 고치면 알려줄게" 정도 한 줄만` }], details: { code: 0 } }
+      return { content: [{ type: 'text', text: `${cfg.lead.name}에게 넘김(${fresh.length}건). 방에는 "접수했어 고치면 알려줄게" 정도 한 줄만` }], details: { code: 0 } }
     },
   })
   pi.registerTool({
@@ -212,7 +213,7 @@ export default function (pi: any) {
         // messages and the saved nickname list first.
         const chat = CHAT_IDS[room()]
         const names = new Map<string, string>()
-        try { for (const [id, n] of Object.entries(JSON.parse(require('node:fs').readFileSync(`${process.env.HOME}/.omocat/sa-cache/kakao-nicks.json`, 'utf8')) as Record<string, string>)) names.set(id, n) } catch {}
+        try { for (const [id, n] of Object.entries(JSON.parse(require('node:fs').readFileSync(`${doriHome()}/sa-cache/kakao-nicks.json`, 'utf8')) as Record<string, string>)) names.set(id, n) } catch {}
         const recent = (await (await fetch(`${LOCO}/messages?chat=${chat}&count=400`, { signal: AbortSignal.timeout(30_000) })).json()) as { sender?: string | null; sender_id: string | number; is_from_me: boolean }[]
         for (const r of recent) if (!r.is_from_me && r.sender) names.set(String(r.sender_id), r.sender)
         const norm = (s: string) => s.split('/')[0]!.replace(/\s+/g, '').toLowerCase()
@@ -239,9 +240,9 @@ export default function (pi: any) {
     name: 'kakao_send_image',
     label: 'Kakao send image',
     description: `지금 방에 이미지 한 장을 보낸다. source 는 공개 웹 이미지 URL(https://...) 또는 이미지 생성이 알려준 파일 경로 그대로(${cfg.kakao.generatedImagesDir} 안의 파일).`,
-    parameters: { type: 'object', properties: { source: { type: 'string', description: '이미지 URL 또는 /tmp/jangdori-img/ 안의 파일' } }, required: ['source'] },
+    parameters: { type: 'object', properties: { source: { type: 'string', description: '이미지 URL 또는 /tmp/omodori-img/ 안의 파일' } }, required: ['source'] },
     async execute(_id: string, params: { source: string }) {
-      // Images and files wait behind queued kakao_send parts so a result never overtakes its summary (acme-rag #23).
+      // Images and files wait behind queued kakao_send parts so a result never overtakes its summary.
       const job = sendChain.then(() => sendImage(params.source))
       sendChain = job.catch(() => {})
       return job
@@ -277,7 +278,7 @@ export default function (pi: any) {
       if (recentSends.some((s) => s.text === params.text && now - s.at < 180_000)) return { content: [{ type: 'text', text: 'skipped: the same message was already sent in the last 3 minutes' }], details: { code: 0 } }
       // 주인 wants short split messages in group rooms and the model keeps packing two sentences into one bubble:
       // split by line and sentence end there. Data blocks ("[제목] ...") and the 1:1 room stay whole.
-      // KakaoTalk turns "#41" into a hashtag that opens a Daum search (주인, 10-13). In the acme room write GitLab refs
+      // KakaoTalk turns "#41" into a hashtag that opens a Daum search (주인, 10-13). Write GitLab refs
       // as words (이슈 41, MR 112) in the rooms listed in kakao.issueRefRooms.
       if (cfg.kakao.issueRefRooms.includes(room())) {
         params.text = params.text
@@ -328,7 +329,7 @@ export default function (pi: any) {
       if (r.code !== 0) return { content: [{ type: 'text', text: `read failed (exit ${r.code}): ${r.text.slice(-300)}` }], details: { code: r.code } }
       // One line per message instead of pretty JSON: 400 messages stay small enough not to slow the lane.
       const kst = (t: string) => new Date(Date.parse(t) + 9 * 3600_000).toISOString().slice(5, 16).replace('T', ' ')
-      const lines = (JSON.parse(r.text) as any[]).reverse().map((m) => `${kst(m.timestamp)} ${m.is_from_me ? '장도리(나)' : (m.sender ?? m.sender_id)}: ${m.photo_url ? '[사진]' : String(m.text ?? '').replace(/\n/g, ' / ')}`)
+      const lines = (JSON.parse(r.text) as any[]).reverse().map((m) => `${kst(m.timestamp)} ${m.is_from_me ? SELF : (m.sender ?? m.sender_id)}: ${m.photo_url ? '[사진]' : String(m.text ?? '').replace(/\n/g, ' / ')}`)
       return { content: [{ type: 'text', text: lines.join('\n') }], details: { code: 0 } }
     },
   })

@@ -7,11 +7,11 @@
 //   bun kakao-stall.ts [--loop MIN] [--min 30]      bun kakao-stall.ts --at <ISO>   (replay against the logs)
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { oldestOpen } from './kakao-queue'
-import { cfg, label } from './config'
+import { cfg, label, doriHome, kakaoLogs, homeRef } from './config'
 
 const HOME = process.env.HOME!
-const LOGS = `${HOME}/Library/Logs/dandori-kakao`
-const STATE = `${HOME}/.omocat/kakao-stall-state.json`
+const LOGS = kakaoLogs()
+const STATE = `${doriHome()}/kakao-stall-state.json`
 const MIN = 60_000
 
 export type LiveEvent = { t: number; chat: string; sender: string; fromMe: boolean }
@@ -86,7 +86,7 @@ async function tick(now: number, minutes: number, replay: boolean): Promise<stri
   const live = existsSync(`${LOGS}/live.ndjson`) ? liveEvents(readFileSync(`${LOGS}/live.ndjson`, 'utf8')) : []
   const push = existsSync(`${LOGS}/push.log`) ? pushTimes(readFileSync(`${LOGS}/push.log`, 'utf8')) : []
   const handled = existsSync(`${LOGS}/wake-filter.ndjson`) ? filterHandled(readFileSync(`${LOGS}/wake-filter.ndjson`, 'utf8')) : {}
-  const rooms = JSON.parse(readFileSync(`${HOME}/.omocat/kakao-rooms.json`, 'utf8'))
+  const rooms = JSON.parse(readFileSync(`${doriHome()}/kakao-rooms.json`, 'utf8'))
   const v = assess(live, push, now, { minutes, rooms, handled, running: replay ? undefined : running() })
   // A quiet hour is not a stall: if the server's newest message in any chat is not newer than our last logged event, nothing was missed.
   if (v.live && !replay && !v.live.includes('not running')) {
@@ -95,13 +95,13 @@ async function tick(now: number, minutes: number, replay: boolean): Promise<stri
     if (newest !== null && newest <= lastLive + 60_000) v.live = null
   }
   if (!replay && !v.push) {
-    v.push = queueStall(oldestOpen(`${HOME}/.omocat/kakao-queue.sqlite`), now, minutes)
+    v.push = queueStall(oldestOpen(`${doriHome()}/kakao-queue.sqlite`), now, minutes)
   }
   if (replay) return [`KAKAO_REPLAY at ${kst(now)} live=${v.live ?? 'ok'} push=${v.push ?? 'ok'}`]
   const prev: Verdict = existsSync(STATE) ? JSON.parse(readFileSync(STATE, 'utf8')) : { live: null, push: null }
   const out: string[] = []
   for (const side of ['live', 'push'] as const) {
-    if (v[side] && !prev[side]) out.push(`KAKAO_STALL ${side} ${v[side]} -> check: bash ~/.omocat/kakao-health.sh; tail ~/Library/Logs/dandori-kakao/${side === 'live' ? 'live.err.log' : 'push.log'}`)
+    if (v[side] && !prev[side]) out.push(`KAKAO_STALL ${side} ${v[side]} -> check: bash ${homeRef()}/kakao-health.sh; tail ${kakaoLogs()}/${side === 'live' ? 'live.err.log' : 'push.log'}`)
     if (!v[side] && prev[side]) out.push(`KAKAO_STALL_RECOVERED ${side}`)
   }
   const tmp = `${STATE}.${process.pid}.tmp`; writeFileSync(tmp, JSON.stringify(v)); renameSync(tmp, STATE)

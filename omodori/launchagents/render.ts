@@ -1,8 +1,8 @@
 // Renders the LaunchAgent plists listed in config.json launchd.services from services.json.
-//   bun launchagents/render.ts --out <dir> [--bun <path>]   writes <label>.plist files, prints one "RENDERED <label> <file>" per plist
+//   bun launchagents/render.ts --out <dir> [--bun <path>] [--config <config.json the services read>]   writes <label>.plist files, prints one "RENDERED <label> <file>" per plist
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { cfg, label, omocatHome } from '../config'
+import { cfg, label, doriHome, kakaoLogs, logDir, installHome } from '../config'
 
 type Service = { args: string[]; keepAlive?: boolean; throttle?: number; interval?: number; calendar?: Record<string, number>; env?: Record<string, string>; out: string; err?: string }
 
@@ -10,9 +10,10 @@ const HOME = process.env.HOME!
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const str = (s: string) => `<string>${esc(s)}</string>`
 
-export function renderPlist(name: string, s: Service, o: { bun: string; home: string; path: string }): string {
-  const sub = (v: string) => v.replaceAll('{bun}', o.bun).replaceAll('{home}', o.home).replaceAll('{logs}', `${HOME}/Library/Logs/dandori-kakao`).replace(/^~(?=\/)/, HOME)
-  const env = { PATH: o.path, HOME, OMOCAT_HOME: o.home, ...(s.env ?? {}) }
+// o.home = data folder (OMODORI_HOME), o.cwd = install folder with the code (defaults to o.home), o.config = config.json.
+export function renderPlist(name: string, s: Service, o: { bun: string; home: string; path: string; cwd?: string; config?: string }): string {
+  const sub = (v: string) => v.replaceAll('{bun}', o.bun).replaceAll('{home}', o.home).replaceAll('{logs}', kakaoLogs()).replaceAll('{logdir}', logDir()).replace(/^~(?=\/)/, HOME)
+  const env = { PATH: o.path, HOME, OMODORI_HOME: o.home, ...(o.config ? { DORI_PORTABLE_CONFIG: o.config } : {}), ...(s.env ?? {}) }
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
@@ -20,7 +21,7 @@ export function renderPlist(name: string, s: Service, o: { bun: string; home: st
     '<dict>',
     `  <key>Label</key>${str(label(name))}`,
     `  <key>ProgramArguments</key><array>${s.args.map((a) => str(sub(a))).join('')}</array>`,
-    `  <key>WorkingDirectory</key>${str(o.home)}`,
+    `  <key>WorkingDirectory</key>${str(o.cwd ?? o.home)}`,
     `  <key>EnvironmentVariables</key><dict>${Object.entries(env).map(([k, v]) => `<key>${esc(k)}</key>${str(v)}`).join('')}</dict>`,
     '  <key>RunAtLoad</key><true/>',
     s.keepAlive ? '  <key>KeepAlive</key><true/>' : '',
@@ -49,7 +50,7 @@ if (import.meta.main) {
     const s = services[name]
     if (!s) { console.log(`UNKNOWN_SERVICE ${name}`); bad++; continue }
     const file = join(out, `${label(name)}.plist`)
-    writeFileSync(file, renderPlist(name, s, { bun, home: omocatHome(), path }))
+    writeFileSync(file, renderPlist(name, s, { bun, home: doriHome(), path, cwd: installHome(), config: arg('--config') }))
     console.log(`RENDERED ${label(name)} ${file}`)
   }
   process.exit(bad ? 1 : 0)

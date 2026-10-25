@@ -41,5 +41,5 @@
  cancel
 
 ─────────────────────────────────────────────────────────────────────────────────────
-/private/tmp/omocat-btn-test • … • 44K/1M (4.4%) (auto)           claude-opus-5-5:low
+/private/tmp/omodori-btn-test • … • 44K/1M (4.4%) (auto)           claude-opus-5-5:low
 (😺 OmO Native by Q Kim) Claude 95/9% CC 91/78% GPT 38% Grok 81%

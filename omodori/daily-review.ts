@@ -7,13 +7,14 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { isRequest, type Ledger, load, redact } from './ledger'
+import { doriHome, cfg } from './config'
 
 const HOME = process.env.HOME!
-const OMOCAT = `${HOME}/.omocat`
-const OUT_DIR = process.env.DORI_REVIEW_DIR ?? `${OMOCAT}/heartbeat`
+const DORI_HOME = `${doriHome()}`
+const OUT_DIR = process.env.DORI_REVIEW_DIR ?? `${DORI_HOME}/heartbeat`
 const SESSIONS = process.env.DORI_SESSIONS ?? `${HOME}/.omo/agent/sessions`
-const INBOX = process.env.DORI_INBOX ?? `${OMOCAT}/inbox.jsonl`
-const MAP = process.env.DORI_SESSIONS_MAP ?? `${OMOCAT}/sessions-map.json`
+const INBOX = process.env.DORI_INBOX ?? `${DORI_HOME}/inbox.jsonl`
+const MAP = process.env.DORI_SESSIONS_MAP ?? `${DORI_HOME}/sessions-map.json`
 const H = 3600_000
 
 export type Msg = { src: 'discord' | 'kakao'; room: string; at: number; text: string; id?: string }
@@ -137,7 +138,7 @@ async function discordBot(channels: string[], from: number): Promise<Msg[]> {
   const out: Msg[] = []
   try {
     const c = JSON.parse(readFileSync(`${HOME}/.config/agent-messenger/discordbot-credentials.json`, 'utf8'))
-    const headers = { Authorization: `Bot ${c.bots.omocat.token}`, 'User-Agent': 'DiscordBot (omocat-daily-review, 1.0)' }
+    const headers = { Authorization: `Bot ${c.bots[cfg.discord.botName].token}`, 'User-Agent': 'DiscordBot (omodori-daily-review, 1.0)' }
     const get = async (p: string): Promise<any> => {
       const r = await fetch(`https://discord.com/api/v10${p}`, { headers, signal: AbortSignal.timeout(15_000) })
       if (r.status === 429) { await Bun.sleep(((await r.json()) as any).retry_after * 1000 + 100); return get(p) }

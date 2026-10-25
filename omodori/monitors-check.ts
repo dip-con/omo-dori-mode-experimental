@@ -1,4 +1,4 @@
-// Standing-monitor check for the Dandori lead (dori-improve 3). Definitions: ~/.omocat/monitors.json.
+// Standing-monitor check for the lead (dori-improve 3). Definitions: ~/.omodori/monitors.json.
 //   bun monitors-check.ts            after a lead restart: one line per monitor; MISSING/EXPIRING/DRIFT lines end
 //                                    with the exact tool.monitor(...) call to paste
 //   bun monitors-check.ts --loop 30  (inside dori-monitors.sh) emits MONITOR_MISSING / MONITOR_EXPIRING (day 6 of 7)
@@ -12,13 +12,14 @@
 // previous session is still valid, is MONITOR_PENDING (restore in progress), not MONITOR_MISSING.
 import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { doriHome, cfg as doriCfg } from './config'
 
 const HOME = process.env.HOME!
-const OMOCAT = process.env.OMOCAT_HOME ?? `${HOME}/.omocat`
+const DORI_HOME = doriHome()
 const SESSIONS_ROOT = process.env.OMO_SESSIONS_DIR ?? `${HOME}/.omo/agent/sessions`
 const LEAD_FILES = 3
 const REPLACED_GRACE_MS = 3600_000
-const STATE = `${OMOCAT}/monitors-check-state.json`
+const STATE = `${DORI_HOME}/monitors-check-state.json`
 const DAY = 86_400_000
 
 export type MonitorDef = { name: string; match: string; description: string; command: string; filter: string }
@@ -82,7 +83,7 @@ export function lines(st: Status[]): string[] {
 function leadSessionIds(prefix: string, paneIds: string[]): Set<string> {
   const ids = new Set(paneIds)
   try {
-    const map = JSON.parse(readFileSync(`${OMOCAT}/sessions-map.json`, 'utf8'))
+    const map = JSON.parse(readFileSync(`${DORI_HOME}/sessions-map.json`, 'utf8'))
     for (const e of Object.values<any>(map)) if (String(e?.key).startsWith(prefix) && e.sessionId) ids.add(String(e.sessionId))
   } catch {}
   return ids
@@ -93,7 +94,7 @@ const birthOf = (path: string) => {
   return m ? Date.parse(`${m[1]}:${m[2]}:${m[3]}.${m[4]}Z`) : statSync(path).birthtimeMs
 }
 
-/** Lead session logs, newest first (by start time): files named _<lead session id>.jsonl or *dandori-lead*.jsonl. */
+/** Lead session logs, newest first (by start time): files named _<lead session id>.jsonl or *dori-lead*.jsonl. */
 export function leadSessionFiles(prefix: string, ids: Set<string>, root = SESSIONS_ROOT): string[] {
   const out: string[] = []
   for (const d of existsSync(root) ? readdirSync(root) : []) {
@@ -145,8 +146,8 @@ function runningUnderLead(defs: MonitorDef[], leadPids: Set<number>, leadIds: Se
 }
 
 export function check(now = Date.now()): Status[] {
-  const cfg = JSON.parse(readFileSync(`${OMOCAT}/monitors.json`, 'utf8'))
-  const prefix = cfg.leadKeyPrefix ?? 'dandori-lead'
+  const cfg = JSON.parse(readFileSync(`${DORI_HOME}/monitors.json`, 'utf8'))
+  const prefix = cfg.leadKeyPrefix ?? doriCfg.lead.keyPrefix
   let paneId = 'wW:p6'
   try { paneId = JSON.parse(readFileSync(`${HOME}/.dori/config.json`, 'utf8')).leadPane ?? paneId } catch {}
   const pane = leadPane(paneId)
@@ -188,10 +189,10 @@ if (import.meta.main) {
   const at = process.argv.indexOf('--at')
   if (process.argv.includes('--wakes')) {
     const h = process.argv.indexOf('--hours')
-    const cfg = JSON.parse(readFileSync(`${OMOCAT}/monitors.json`, 'utf8'))
-    const prefix = cfg.leadKeyPrefix ?? 'dandori-lead'
+    const cfg = JSON.parse(readFileSync(`${DORI_HOME}/monitors.json`, 'utf8'))
+    const prefix = cfg.leadKeyPrefix ?? doriCfg.lead.keyPrefix
     const files = leadSessionFiles(prefix, leadSessionIds(prefix, []))
-    const standing = [...cfg.monitors.map((d: MonitorDef) => d.description), 'OmOMeow Herdr watch']
+    const standing = [...cfg.monitors.map((d: MonitorDef) => d.description), 'Herdr watch']
     const w = wakes(files, h > 0 ? Number(process.argv[h + 1]) : 24, Date.now(), standing)
     console.log(`MONITOR_WAKES hours=${w.hours} total=${w.total} ask=${w.ask} nonask=${w.nonAsk} nonask_per_hour=${w.nonAskPerHour} standing_nonask=${w.standingNonAsk} standing_nonask_per_hour=${w.standingNonAskPerHour} by_monitor=${JSON.stringify(w.byMonitor)}`)
   } else if (i < 0) {

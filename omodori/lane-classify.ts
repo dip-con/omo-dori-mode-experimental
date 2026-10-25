@@ -1,4 +1,4 @@
-// Lane quota/stall classifier (redesign S8, docs/dori-redesign/final.md §2.3 "quota/stall 모델"); replaces lane-health.ts
+// Lane quota/stall classifier (redesign S8 "quota/stall 모델"); replaces lane-health.ts
 // assess() for the supervisor (S9). Pure functions over the transcript tail, the supervisor snapshot row, usage and auth.
 // Axes are kept apart: progress (did the lane answer its input), credential (the last error with no success after it),
 // provider (whose quota it is) and per-account state (present in auth.json, usage fresh, full).
@@ -15,7 +15,7 @@
 //   - an error before any successful assistant entry is a pre-assistant failure: credential_error (ask) unless it is a quota text
 //   - one blocked account is not a stall: the lane on it moves to a free account; lanes on other accounts stay ok
 import { existsSync, readFileSync } from 'node:fs'
-import { cfg } from './config'
+import { cfg, isLeadKey } from './config'
 
 export const CLAUDE_PROVIDER = 'anthropic-subscription'
 export const CLAUDE_ACCOUNTS = cfg.claudeAccounts
@@ -42,16 +42,16 @@ export const normStatus = (s: string | null | undefined) => (s === 'working' ? '
 
 type Entry = { ts: number; kind: 'delivery' | 'assistant'; ok?: boolean; error?: string; provider?: string }
 
-/** Delivery entries (admission custom_message, or a herdr user message carrying a dandori tag) and assistant entries. */
+/** Delivery entries (admission custom_message, or a herdr user message carrying a dori tag) and assistant entries. */
 export function transcriptEntries(text: string): Entry[] {
   const out: Entry[] = []
   for (const l of text.split('\n')) {
-    if (!l.includes('"custom_message"') && !l.includes('"role":"assistant"') && !l.includes('[dandori-msg:')) continue
+    if (!l.includes('"custom_message"') && !l.includes('"role":"assistant"') && !l.includes('[dori-msg:')) continue
     let j: any
     try { j = JSON.parse(l) } catch { continue }
     const ts = Date.parse(j.timestamp)
     if (j.type === 'custom_message' && j.customType === 'session_control_delivery') out.push({ ts, kind: 'delivery' })
-    else if (j.type === 'message' && j.message?.role === 'user' && JSON.stringify(j.message.content ?? '').includes('[dandori-msg:')) out.push({ ts, kind: 'delivery' })
+    else if (j.type === 'message' && j.message?.role === 'user' && JSON.stringify(j.message.content ?? '').includes('[dori-msg:')) out.push({ ts, kind: 'delivery' })
     else if (j.type === 'message' && j.message?.role === 'assistant') {
       const err = j.message.stopReason === 'error'
       out.push({ ts, kind: 'assistant', ok: !err && j.message.stopReason !== 'aborted', error: err ? String(j.message.errorMessage ?? 'error') : undefined, provider: j.message.provider })
@@ -149,7 +149,7 @@ if (import.meta.main) {
   const auth = readJson(`${HOME}/.omo/agent/auth.json`)
   const snap = readLaneStatus()
   const map = readMap()
-  const keys = argv.includes('--all') ? Object.values(map).filter((e) => e.status === 'open' && !e.key.startsWith('dandori-lead')).map((e) => e.key) : argv.filter((a) => !a.startsWith('--'))
+  const keys = argv.includes('--all') ? Object.values(map).filter((e) => e.status === 'open' && !isLeadKey(e.key)).map((e) => e.key) : argv.filter((a) => !a.startsWith('--'))
   if (!keys.length) { console.error('usage: lane-classify.ts <key> | --all [--json]'); process.exit(2) }
   for (const key of keys) {
     const e = map[key]

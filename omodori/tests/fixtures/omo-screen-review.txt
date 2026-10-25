@@ -14,7 +14,7 @@
  파서가 잘 버티는지 보려고 일부러 길게 씁니다. 정말 긴 문장입니다.", multiSelect
  false, options with descriptions: label "스테이징" description "먼저 dev 에서 확인
  ", label "프로덕션" description "바로 운영". (2) header "알림", question "누구에게
- 알릴까요?", multiSelect true, options "주인", "오모냥", "아무도". Then reply
+ 알릴까요?", multiSelect true, options "주인", "모모", "아무도". Then reply
  ANSWER: <result> and stop.
 
 
@@ -41,5 +41,5 @@
  enter submit  ↑ review answers  shift+tab back  tab next question  esc back
 
 ─────────────────────────────────────────────────────────────────────────────────────
-/private/tmp/omocat-btn-test • … • 45K/1M (4.5%) (auto)           claude-opus-5-5:low
+/private/tmp/omodori-btn-test • … • 45K/1M (4.5%) (auto)           claude-opus-5-5:low
 (😺 OmO Native by Q Kim) Claude 95/9% CC 91/78% GPT 38% Grok 81%

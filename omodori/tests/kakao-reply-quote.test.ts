@@ -62,7 +62,7 @@ test('non-replies add nothing and long originals are cut at 300 chars', async ()
 
 test('route puts the quote line under the reply in the lane payload', async () => {
   const line = JSON.stringify({ chat_id: 'C', sender_id: 'S', sender: 'test', message_type: 26, timestamp: '2026-10-23T00:00:00Z',
-    log_id: 'L', reply_to_log_id: '1', reply_to_text: '견적서 초안입니다', text: '강비서 이거 PDF로' })
+    log_id: 'L', reply_to_log_id: '1', reply_to_text: '견적서 초안입니다', text: '루루 이거 PDF로' })
     .replace('"C"', CHAT).replace('"S"', '777001').replace('"L"', '1')
-  expect((await route(line))?.text).toBe('[호출] test: 강비서 이거 PDF로\n답장 대상: ?, 시각 미상, 견적서 초안입니다')
+  expect((await route(line))?.text).toBe('[호출] test: 루루 이거 PDF로\n답장 대상: ?, 시각 미상, 견적서 초안입니다')
 })

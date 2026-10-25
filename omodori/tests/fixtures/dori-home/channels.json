@@ -13,10 +13,10 @@
    }
   },
   "1000000000000000012": {
-   "key": "acme",
-   "name": "acme",
-   "path": "~/Work/acme",
-   "repo": "gitlab.example.com/work/acme"
+   "key": "app",
+   "name": "app",
+   "path": "~/Work/app",
+   "repo": "gitlab.example.com/work/app"
   }
  }
 }

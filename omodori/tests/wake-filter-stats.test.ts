@@ -42,7 +42,7 @@ test('report puts alerts first, has numbers and no message text or emoji', () =>
   expect(out).not.toMatch(/\p{Extended_Pictographic}/u)
 })
 
-test('[ACME] 테스트 collected lines are counted inside skips', () => {
+test('[작업] 문서방 collected lines are counted inside skips', () => {
   const extra = [{ at: '2026-10-20T15:00:00+09:00', room: 'D방', chat: '3', log_id: '20', decision: 'skip', reason: 'jev', triage: 'collect', ms: 190, tokens: 2400 }]
   const s = summarize([...rows, ...extra], day.start, day.end)
   expect(s.rooms['D방']).toMatchObject({ messages: 1, skip: 1, collect: 1 })

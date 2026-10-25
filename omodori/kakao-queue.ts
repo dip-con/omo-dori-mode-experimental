@@ -1,4 +1,4 @@
-// Kakao delivery queue (redesign S7, docs/dori-redesign/final.md §2.7). The one writer is kakao-push.ts; everyone else
+// Kakao delivery queue (redesign S7). The one writer is kakao-push.ts; everyone else
 // reads with `sqlite3 -readonly`. Crash boundaries are transactions:
 //   intake      complete live.ndjson lines + cursor advance in one transaction (a partial last line never moves the cursor)
 //   room_state  pending / held / burst per chat, saved on every change and restored on start
@@ -10,14 +10,15 @@
 //       rollback drain: queued/refused/carried and accepted/uncertain-without-receipt batches go out in order through the
 //       old path (`bun sess.ts send <lane> --id <batch id> <body>`), each marked persisted on exit 0. Run it with
 //       flags/kakao.pause-admission set and no batch in 'accepted', before reverting kakao-push.ts.
-// OMOCAT_HOME (default ~/.omocat) roots the database; tests point it at a temp dir.
+// OMODORI_HOME (default ~/.omodori) roots the database; tests point it at a temp dir.
 import { Database } from 'bun:sqlite'
 import { createHash } from 'node:crypto'
 import { chmodSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { doriHome } from './config'
 
-export const omocat = () => process.env.OMOCAT_HOME ?? `${process.env.HOME}/.omocat`
-export const queuePath = (home = omocat()) => join(home, 'kakao-queue.sqlite')
+export const omodori = () => doriHome()
+export const queuePath = (home = omodori()) => join(home, 'kakao-queue.sqlite')
 
 export type BatchState = 'queued' | 'accepted' | 'uncertain' | 'persisted' | 'refused' | 'carried'
 /** Not yet proven delivered. 'refused' = the last attempt sent nothing; it is retried with the same id, never dropped. */
@@ -339,7 +340,7 @@ if (import.meta.main) {
     const { readMap } = await import('./registry')
     const { findSessionFile } = await import('./sess')
     const q = Queue.open(path)
-    const home = omocat()
+    const home = omodori()
     const res = await replayLegacy(q, {
       send: async (lane, body, id) => {
         const p = Bun.spawn(['bun', 'sess.ts', 'send', lane, '--id', id, body], { cwd: home, stdout: 'inherit', stderr: 'inherit' })

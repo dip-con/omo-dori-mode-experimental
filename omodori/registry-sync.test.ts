@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { readMap } from './registry'
 import { argvSession, reconcile, type SyncDeps } from './registry-sync'
 
-const ROOT = process.env.OMOCAT_HOME ?? mkdtempSync(join(tmpdir(), 'omocat-s3-sync-'))
+const ROOT = process.env.OMODORI_HOME ?? mkdtempSync(join(tmpdir(), 'omodori-s3-sync-'))
 let n = 0
 const home = () => { const d = join(ROOT, `sync${++n}-${process.pid}`); mkdirSync(d, { recursive: true }); return d }
 const AGENT_ARGV = (id?: string) => ['/x/bun.exe', '/x/@code-yeongyu/senpi/dist/bundle/cli.js', '--extension', '/x/plugin', ...(id ? ['--session', id] : [])]
@@ -26,7 +26,7 @@ const deps = (h: string, over: Partial<SyncDeps> = {}): SyncDeps => ({
 
 test('argv id != map id: drift 1; --write rebinds, keeps the generation, appends the old id to lineage.sessions, mirrors the dori lane', async () => {
   const h = home()
-  seed(h, { a: lane('a'), lead: lane('dandori-lead-1', { key: 'dandori-lead-1' }) })
+  seed(h, { a: lane('a'), lead: lane('dori-lead-1', { key: 'dori-lead-1' }) })
   mkdirSync(join(h, 'dori-lanes'), { recursive: true })
   writeFileSync(join(h, 'dori-lanes', 'a.json'), JSON.stringify({ key: 'a', session: 'map-id' }))
   const dry = await reconcile(deps(h), { write: false })

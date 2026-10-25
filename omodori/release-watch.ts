@@ -1,4 +1,4 @@
-// Weekly OMO release + dependency security watch for the Dandori lead (dori-improve 2).
+// Weekly OMO release + dependency security watch for the lead (dori-improve 2).
 //   bun release-watch.ts            one pass; prints only what changed since the last pass
 //   bun release-watch.ts --loop 60  one pass every 60 minutes (wire into dori-monitors.sh)
 // Event prefix: RELEASE_WATCH (state change) / RELEASE_WATCH_ERROR (newly failing audit).
@@ -8,8 +8,8 @@ import { join } from 'node:path'
 
 const HOME = process.env.HOME!
 export const OMO_PKG = join(HOME, '.bun/install/global/node_modules/omo-ai/package.json')
-export const CHANNELS = join(HOME, '.omocat/channels.json')
-export const STATE = join(HOME, '.omocat/release-watch-state.json')
+export const CHANNELS = join(HOME, '.omodori/channels.json')
+export const STATE = join(HOME, '.omodori/release-watch-state.json')
 
 export type RepoAudit = { key: string; path: string; high: number; critical: number; error?: string; skip?: boolean }
 export type Snapshot = { at: string; installed: string; latest: string; repos: RepoAudit[] }

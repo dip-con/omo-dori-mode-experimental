@@ -1,9 +1,9 @@
-// Discord buttons for OmOMeow: `oc.ts ask` questions and OMO session questions (auto-posted by
+// Discord buttons for the lead: `oc.ts ask` questions and OMO session questions (auto-posted by
 // herdr-watch, answered by an owner press that listener.ts injects into the pane).
 // State lives in SQLite so buttons keep working across restarts of either process.
 import { Database } from 'bun:sqlite'
 import { readFileSync } from 'node:fs'
-import { cfg } from './config'
+import { cfg, doriHome } from './config'
 import {
   type Answer, type PaneQuestion, answerLabel, callMatchesScreen, chunkRows, parseCustomId, parseOmoScreen,
   parseSessionQuestionCalls, questionResult, questionRows, questionUiAtBottom, readTail, sessionLogCandidates, sessionRoot,
@@ -25,7 +25,7 @@ export type Ask = {
 
 export class Store {
   readonly db: Database
-  constructor(path = process.env.OMOCAT_BUTTONS_DB ?? `${HOME}/.omocat/buttons.db`) {
+  constructor(path = process.env.OMODORI_BUTTONS_DB ?? `${doriHome()}/buttons.db`) {
     this.db = new Database(path, { create: true })
     this.db.exec('PRAGMA journal_mode=WAL')
     this.db.exec('PRAGMA busy_timeout=5000')
@@ -57,9 +57,9 @@ export type Discord = (method: string, path: string, body?: unknown) => Promise<
 export function discordRest(fetcher: typeof fetch = fetch): Discord {
   let auth: string | null = null
   return async (method, path, body) => {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'User-Agent': 'DiscordBot (omocat, 1.0)' }
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'User-Agent': 'DiscordBot (omodori, 1.0)' }
     if (!path.startsWith('/interactions/')) {
-      auth ??= `Bot ${JSON.parse(readFileSync(`${HOME}/.config/agent-messenger/discordbot-credentials.json`, 'utf8')).bots.omocat.token}`
+      auth ??= `Bot ${JSON.parse(readFileSync(`${HOME}/.config/agent-messenger/discordbot-credentials.json`, 'utf8')).bots[cfg.discord.botName].token}`
       headers.Authorization = auth
     }
     const res = await fetcher(`https://discord.com/api/v10${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
@@ -130,7 +130,7 @@ export async function refresh(a: Ask, deps: Deps): Promise<void> {
   const chunks = components(a)
   for (const [i, id] of a.messageIds.entries()) {
     const res = await deps.discord('PATCH', `/channels/${a.channel}/messages/${id}`, { content: i === 0 ? renderContent(a) : '⏸ (계속)', components: chunks[i] ?? [] })
-    if (!res.ok) deps.log?.(`omocat-buttons edit failed ${res.status}`)
+    if (!res.ok) deps.log?.(`omodori-buttons edit failed ${res.status}`)
   }
 }
 
@@ -160,7 +160,7 @@ export async function handleInteraction(ev: Interaction, deps: Deps, opts: { ack
   // Ack first: Discord's window is 3 seconds and the injection below takes longer.
   if (!opts.acked) {
     const ack = await deps.discord('POST', `/interactions/${ev.id}/${ev.token}/callback`, { type: 6 })
-    if (!ack.ok) deps.log?.(`omocat-buttons ack failed ${ack.status}`)
+    if (!ack.ok) deps.log?.(`omodori-buttons ack failed ${ack.status}`)
   }
   const parsed = parseCustomId(base.custom_id)
   const a = parsed ? deps.store.get(parsed.id) : null
@@ -211,7 +211,7 @@ export async function pollRelayOnce(deps: Deps, opts: { key: string; waitSeconds
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const items = (await res.json()) as Interaction[]
   for (const ev of items) {
-    await handleInteraction(ev, deps, { acked: true }).catch((err: Error) => deps.log?.(`OMOCAT_ERROR relay handling failed: ${err.message}`))
+    await handleInteraction(ev, deps, { acked: true }).catch((err: Error) => deps.log?.(`OMODORI_ERROR relay handling failed: ${err.message}`))
   }
   return items.length
 }
@@ -265,7 +265,7 @@ const summary = (a: Ask) => a.questions.map((q, qi) => ({ question: q.text, answ
 const squash = (s: string) => s.replace(/\s+/g, '')
 export async function injectAnswers(a: Ask, deps: Deps): Promise<{ ok: boolean; reason?: string; text?: string }> {
   const pane = a.pane!
-  if (pane === SELF_PANE) return { ok: false, reason: 'OmOMeow 자신의 pane' }
+  if (pane === SELF_PANE) return { ok: false, reason: '리드 자신의 pane' }
   const before = await deps.herdr.read(pane).catch(() => '')
   const screen = parseOmoScreen(before)
   if (!screen) return { ok: false, reason: '질문 화면이 아님(이미 답했거나 취소됨)' }

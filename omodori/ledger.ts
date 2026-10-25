@@ -1,5 +1,5 @@
-// Promise + request ledger (dori-improve 4, 5). State: ~/.omocat/ledger.json.
-//   Promises: Dandori-bot messages (lead and lanes) with a timed commitment ("15시 재시작 때", "내일 아침", "13:50 이후")
+// Promise + request ledger (dori-improve 4, 5). State: ~/.omodori/ledger.json.
+//   Promises: Bot messages (lead and lanes) with a timed commitment ("15시 재시작 때", "내일 아침", "13:50 이후")
 //             are logged with a due time; at the due time a PROMISE_DUE line wakes the lead (once).
 //   Requests: every owner (is_owner) Discord message is an open request; a later bot message in the same
 //             channel/thread marks it "responded"; it stays open until the lead marks it done.
@@ -10,13 +10,13 @@
 // Every write goes through withLedger: <ledger>.lock (registry.ts acquireDirLock) + fresh re-read + apply + tmp+rename.
 // The sweep does its Discord reads on an unlocked snapshot and applies the result to a fresh copy under the lock.
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { acquireDirLock, omocatHome } from './registry'
-import { cfg } from './config'
+import { acquireDirLock, doriHome } from './registry'
+import { cfg, homeRef } from './config'
 
 const HOME = process.env.HOME!
-const OMOCAT = omocatHome()
-const LEDGER = process.env.DORI_LEDGER ?? `${OMOCAT}/ledger.json`
-const INBOX = `${OMOCAT}/inbox.jsonl`
+const DORI_HOME = doriHome()
+const LEDGER = process.env.DORI_LEDGER ?? `${DORI_HOME}/ledger.json`
+const INBOX = `${DORI_HOME}/inbox.jsonl`
 const GENERAL = cfg.discord.generalChannel
 const H = 3600_000
 
@@ -126,7 +126,7 @@ export function ingest(l: Ledger, owner: { id: string; channel_id: string; conte
   for (const p of l.promises) {
     if (p.status !== 'open' || p.fired || p.due > now) continue
     p.fired = true
-    events.push(`PROMISE_DUE ${p.id} due ${kstLabel(p.due)} ch=${p.channel} "${p.phrase}" in: "${redact(p.text).slice(0, 140)}" -> bun ~/.omocat/ledger.ts promise done ${p.id} (or drop ${p.id})`)
+    events.push(`PROMISE_DUE ${p.id} due ${kstLabel(p.due)} ch=${p.channel} "${p.phrase}" in: "${redact(p.text).slice(0, 140)}" -> bun ${homeRef()}/ledger.ts promise done ${p.id} (or drop ${p.id})`)
   }
   return events
 }
@@ -146,7 +146,7 @@ export function brief(l: Ledger, now: number): string[] {
 
 function creds() {
   const c = JSON.parse(readFileSync(`${HOME}/.config/agent-messenger/discordbot-credentials.json`, 'utf8'))
-  return { Authorization: `Bot ${c.bots.omocat.token}`, 'User-Agent': 'DiscordBot (omocat-ledger, 1.0)' }
+  return { Authorization: `Bot ${c.bots[cfg.discord.botName].token}`, 'User-Agent': 'DiscordBot (omodori-ledger, 1.0)' }
 }
 async function api(path: string): Promise<any> {
   const r = await fetch(`https://discord.com/api/v10${path}`, { headers: creds() })
@@ -169,7 +169,7 @@ async function sweep(): Promise<string[]> {
   const l = load() // read-only snapshot for the fetch plan; never saved
   const now = Date.now()
   const owner = inboxOwner(l.since)
-  const map = existsSync(`${OMOCAT}/sessions-map.json`) ? JSON.parse(readFileSync(`${OMOCAT}/sessions-map.json`, 'utf8')) : {}
+  const map = existsSync(`${DORI_HOME}/sessions-map.json`) ? JSON.parse(readFileSync(`${DORI_HOME}/sessions-map.json`, 'utf8')) : {}
   const channels = new Set<string>([GENERAL, ...owner.filter((o) => now - o.at < 72 * H).map((o) => o.channel_id),
     ...Object.values<any>(map).filter((e) => e?.status === 'open' && e.thread).map((e) => String(e.thread)),
     ...l.requests.filter((r) => r.status === 'open').map((r) => r.channel)])

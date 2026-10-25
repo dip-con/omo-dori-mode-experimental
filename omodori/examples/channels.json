@@ -16,7 +16,7 @@
       "session": {
         "mode": "herdr",
         "key": "notes",
-        "note": "relay each Discord message with `bun ~/.omocat/sess.ts send notes \"[discord #notes] (msg <id>) <text>\"`; if closed, `sess.ts reopen notes`."
+        "note": "relay each Discord message with `bun ~/.omodori/sess.ts send notes \"[discord #notes] (msg <id>) <text>\"`; if closed, `sess.ts reopen notes`."
       }
     }
   }

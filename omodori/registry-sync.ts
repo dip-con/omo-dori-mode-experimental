@@ -1,5 +1,5 @@
-// Registry reconciler (redesign S3, docs/dori-redesign/final.md §2.2 rule 4).
-// For every open lane (dandori-lead* excluded) it finds the session the pane's agent really serves and compares it
+// Registry reconciler (redesign S3).
+// For every open lane (dori-lead* excluded) it finds the session the pane's agent really serves and compares it
 // with sessions-map.json. Evidence, strongest first:
 //   1. endpoint: the agent pid's control endpoint (omo host status) answers list_sessions with a durable id
 //   2. argv: the agent's --session / --session-id (stale after an in-process session replacement, so only used when
@@ -15,6 +15,7 @@ import { Conn } from './rpc'
 import { sessionDirSlug, sessionRoot } from './questions'
 import { addLineage, appendEvent, leaseActive, patchLane, readMap, RegistryError, updateDoriLane } from './registry'
 import { findSessionFile } from './sess'
+import { isLeadKey } from './config'
 
 export type Proc = { pid: number; argv: string[] }
 export type Endpoint = { pid: number; socket: string; instanceId: string; kind: 'tui' | 'rpc_host' }
@@ -42,7 +43,7 @@ export async function reconcile(deps: SyncDeps, opts: { write: boolean }): Promi
   const lines: string[] = []
   let drift = 0
   const map = readMap(deps.home)
-  const lanes = Object.values(map).filter((e) => e?.status === 'open' && e.sessionId && e.pane && !String(e.key).startsWith('dandori-lead'))
+  const lanes = Object.values(map).filter((e) => e?.status === 'open' && e.sessionId && e.pane && !isLeadKey(String(e.key)))
   const eps = lanes.length ? await deps.endpoints().catch(() => [] as Endpoint[]) : []
   for (const e of lanes) {
     if (leaseActive(e.key, deps.home)) continue

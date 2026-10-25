@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "omocat",
+      "name": "omodori",
       "dependencies": {
         "agent-messenger": "2.38.0",
       },
