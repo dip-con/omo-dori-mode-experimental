@@ -1,0 +1,9 @@
+{
+  "//": "Core LaunchAgents install.sh renders with render.ts. {bun} = the bun binary, {home} = the data folder (OMODORI_HOME / paths.dataDir), {logdir} = paths.logDir (default ~/Library/Logs/omodori), {logs} = {logdir}/core, {dir} = this core folder (also the working directory). Label = <launchd.prefix>.<name> from config.json. launchd.services in config.json picks which ones are installed. Messenger sources bring their own templates (sources/<name>/manifest.json launchAgents), installed by `omodori onboard <name>`.",
+  "supervisor": { "args": ["{bun}", "dori-supervisor.ts"], "keepAlive": true, "throttle": 5, "out": "{logdir}/supervisor/supervisor.log" },
+  "heartbeat": { "args": ["{bun}", "heartbeat.ts", "run"], "interval": 300, "env": { "HEARTBEAT_LANE_RESTART": "0", "HEARTBEAT_RESTART_SOURCE_LANES": "0" }, "out": "{logs}/heartbeat.log" },
+  "decisions": { "args": ["{bun}", "decision.ts", "tick"], "interval": 300, "out": "{logs}/decisions.log" },
+  "ceo-weekly": { "args": ["{bun}", "ceo-weekly.ts"], "calendar": { "Weekday": 1, "Hour": 8, "Minute": 30 }, "out": "{logs}/ceo-weekly.log" },
+  "repo-patrol": { "args": ["{bun}", "repo-patrol.ts", "run"], "calendar": { "Hour": 9, "Minute": 30 }, "out": "{logs}/repo-patrol.log" },
+  "git-sync": { "args": ["/bin/bash", "git-sync.sh"], "interval": 3600, "out": "{logs}/git-sync.log" }
+}

@@ -1,0 +1,353 @@
+{
+  "note": "event-router.ts rule table (redesign S6). route: ask = DORI_ASK now; act/info/fail = next DORI_DIGEST; drop = never shown. events: first rule whose kind matches (and whose optional `when` holds) wins, else the event's own severity, else defaults.event. legacy: first regex match wins; a line that matches none but matches defaults.legacyVisible (the pre-S6 dori-sweeps filter) goes to defaults.legacyUnmatched so nothing the lead used to see is hidden; anything else is dropped as before. Enabled sources add their own rules (sources/<name>/event-rules.json, checked first) and legacyVisible prefixes.",
+  "digestEveryMin": 15,
+  "nightDigestEveryMin": 60,
+  "nightKst": {
+    "from": "23:30",
+    "to": "07:00"
+  },
+  "maxItemsPerList": 40,
+  "defaults": {
+    "event": "act",
+    "legacyVisible": "^(LANE_|DEAD_PANE|HOST_GUARD|NUDGED|POSTED|NO-REPORT|STALE-REPORT|WARN|MONITOR_|PROMISE_|REQUEST_|DAILY_REVIEW|RELEASE_WATCH)",
+    "legacyUnmatched": "act"
+  },
+  "events": [
+    {
+      "kind": "lane.gone",
+      "when": {
+        "path": "data.closedByLead",
+        "eq": true
+      },
+      "route": "info"
+    },
+    {
+      "kind": "lane.gone",
+      "when": {
+        "path": "data.children.state",
+        "eq": "unknown"
+      },
+      "route": "ask"
+    },
+    {
+      "kind": "lane.gone",
+      "when": {
+        "path": "data.children.running",
+        "gt": 0
+      },
+      "route": "ask"
+    },
+    {
+      "kind": "lane.gone",
+      "route": "info"
+    },
+    {
+      "kind": "lane.question",
+      "route": "ask"
+    },
+    {
+      "kind": "lane.blocked",
+      "route": "ask"
+    },
+    {
+      "kind": "lane.stalled",
+      "route": "ask"
+    },
+    {
+      "kind": "lane.quota_all",
+      "route": "ask"
+    },
+    {
+      "kind": "lane.quota_reset",
+      "route": "ask"
+    },
+    {
+      "kind": "lane.empty_after_handoff",
+      "route": "ask"
+    },
+    {
+      "kind": "lane.holder_conflict",
+      "route": "ask"
+    },
+    {
+      "kind": "lane.account_mismatch",
+      "route": "ask"
+    },
+    {
+      "kind": "delivery.stuck",
+      "route": "ask"
+    },
+    {
+      "kind": "registry.generation_conflict",
+      "route": "ask"
+    },
+    {
+      "kind": "host.unreachable",
+      "route": "ask"
+    },
+    {
+      "kind": "lane.quota",
+      "route": "act"
+    },
+    {
+      "kind": "lane.transition",
+      "route": "act"
+    },
+    {
+      "kind": "lane.session_replaced",
+      "route": "act"
+    },
+    {
+      "kind": "lane.provider_error",
+      "route": "act"
+    },
+    {
+      "kind": "lane.usage_stale",
+      "route": "act"
+    },
+    {
+      "kind": "lane.context_high",
+      "route": "act"
+    },
+    {
+      "kind": "delivery.refused",
+      "route": "act"
+    },
+    {
+      "kind": "delivery.uncertain",
+      "route": "act"
+    },
+    {
+      "kind": "registry.drift",
+      "route": "act"
+    },
+    {
+      "kind": "host.superseded",
+      "route": "act"
+    },
+    {
+      "kind": "lane.turn_done",
+      "route": "info"
+    },
+    {
+      "kind": "lane.offline",
+      "route": "info"
+    },
+    {
+      "kind": "lane.opened",
+      "route": "info"
+    },
+    {
+      "kind": "lane.closed",
+      "route": "info"
+    },
+    {
+      "kind": "lane.question_closed",
+      "route": "info"
+    },
+    {
+      "kind": "lane.children_changed",
+      "route": "info"
+    },
+    {
+      "kind": "lane.dag_run",
+      "route": "info"
+    },
+    {
+      "kind": "lane.seed_applied",
+      "route": "info"
+    },
+    {
+      "kind": "lane.account_bound",
+      "route": "info"
+    },
+    {
+      "kind": "delivery.sent",
+      "route": "info"
+    },
+    {
+      "kind": "delivery.persisted",
+      "route": "info"
+    },
+    {
+      "kind": "registry.reconciled",
+      "route": "info"
+    },
+    {
+      "kind": "digest",
+      "route": "drop"
+    }
+  ],
+  "legacy": [
+    {
+      "re": "^UNRECOGNISED_PANE ",
+      "kind": "lane.unrecognised_pane",
+      "route": "drop"
+    },
+    {
+      "re": "^(HOST_GUARD_READY|LANE_WATCH_READY)\\s*$",
+      "kind": "legacy.ready",
+      "route": "drop"
+    },
+    {
+      "re": "^LANE_QUOTA_ALL ",
+      "kind": "lane.quota_all",
+      "route": "ask"
+    },
+    {
+      "re": "^LANE_QUOTA_RESET ",
+      "kind": "lane.quota_reset",
+      "route": "ask"
+    },
+    {
+      "re": "^LANE_QUOTA ",
+      "kind": "lane.quota",
+      "route": "act"
+    },
+    {
+      "re": "^LANE_STALLED ",
+      "kind": "lane.stalled",
+      "route": "ask"
+    },
+    {
+      "re": "^LANE_MIGRATED \\S+ exit=0\\b",
+      "kind": "lane.transition",
+      "route": "act"
+    },
+    {
+      "re": "^LANE_MIGRATED ",
+      "kind": "lane.transition_failed",
+      "route": "fail"
+    },
+    {
+      "re": "^LANE_CONTEXT ",
+      "kind": "lane.context_high",
+      "route": "act"
+    },
+    {
+      "re": "^LANE_UNRESOLVED ",
+      "kind": "registry.drift",
+      "route": "act"
+    },
+    {
+      "re": "^LANE_DONE_CLAIMED ",
+      "kind": "lane.done_claimed",
+      "route": "ask"
+    },
+    {
+      "re": "^LANE_NOT_DONE ",
+      "kind": "lane.not_done",
+      "route": "act"
+    },
+    {
+      "re": "^LANE_CLOSED ",
+      "kind": "lane.closed",
+      "route": "info"
+    },
+    {
+      "re": "^LANE_(REAP_TAB|HOLD_EXPIRED|LEFTOVER|EMPTY_TAB) ",
+      "kind": "lane.reap_proposal",
+      "route": "act"
+    },
+    {
+      "re": "^(LANE_STATE|LANE_CTX_STATE) ",
+      "kind": "lane.state",
+      "route": "drop"
+    },
+    {
+      "re": "^[A-Z_]+_(ERROR|WARN)\\b",
+      "kind": "sweep.error",
+      "route": "fail"
+    },
+    {
+      "re": "^WARN\\b",
+      "kind": "sweep.error",
+      "route": "fail"
+    },
+    {
+      "re": "^NO-NUDGE ",
+      "kind": "lane.nudge_proposal",
+      "route": "act"
+    },
+    {
+      "re": "^NUDGED ",
+      "kind": "lane.nudged",
+      "route": "act"
+    },
+    {
+      "re": "^(POSTED|NO-REPORT|STALE-REPORT)\\b",
+      "kind": "lane.report",
+      "route": "act"
+    },
+    {
+      "re": "^DEAD_PANE ",
+      "kind": "lane.dead_pane",
+      "route": "ask"
+    },
+    {
+      "re": "^UNRECOGNISED_PANE ",
+      "kind": "lane.unrecognised_pane",
+      "route": "act"
+    },
+    {
+      "re": "^HOST_GUARD ALERT\\b",
+      "kind": "host.guard_alert",
+      "route": "ask"
+    },
+    {
+      "re": "^HOST_GUARD ",
+      "kind": "host.guard",
+      "route": "info"
+    },
+    {
+      "re": "^MONITOR_(MISSING|EXPIRING|DRIFT) ",
+      "kind": "monitor.problem",
+      "route": "ask"
+    },
+    {
+      "re": "^MONITOR_PENDING ",
+      "kind": "monitor.pending",
+      "route": "act"
+    },
+    {
+      "re": "^MONITOR_OK ",
+      "kind": "monitor.ok",
+      "route": "drop"
+    },
+    {
+      "re": "^PROMISE_DUE ",
+      "kind": "ledger.promise_due",
+      "route": "ask"
+    },
+    {
+      "re": "^REQUEST_",
+      "kind": "ledger.request",
+      "route": "act"
+    },
+    {
+      "re": "^DAILY_REVIEW ",
+      "kind": "daily_review",
+      "route": "ask"
+    },
+    {
+      "re": "^RELEASE_WATCH ",
+      "kind": "release_watch",
+      "route": "act"
+    },
+    {
+      "re": "^REGISTRY_RECONCILED ",
+      "kind": "registry.reconciled",
+      "route": "info"
+    },
+    {
+      "re": "^DRIFT ",
+      "kind": "registry.drift",
+      "route": "act"
+    },
+    {
+      "re": "^UNCONFIRMED ",
+      "kind": "registry.unconfirmed",
+      "route": "info"
+    }
+  ]
+}
