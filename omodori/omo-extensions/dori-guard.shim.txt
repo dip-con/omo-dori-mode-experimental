@@ -1,0 +1,3 @@
+// dori-improve 1: blocks lane launches into project channels and kills of the Dandori lead.
+// Delete this file to disable (only newly started omo sessions are affected).
+export { default } from "file://__OMOCAT_HOME__/dori-guard-ext.ts";

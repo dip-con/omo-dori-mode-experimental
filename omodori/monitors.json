@@ -1,0 +1,29 @@
+{
+  "note": "Dandori lead standing monitors (dandori-local). monitors-check.ts compares these with the running processes and the lead session's last registration; persistent monitors expire 7 days after registration. Redesign S6: the herdr monitor is gone (supervisor events reach the lead only through event-router.ts inside dori-monitors.sh).",
+  "leadKeyPrefix": "dandori-lead",
+  "expireDays": 7,
+  "warnDays": 6,
+  "monitors": [
+    {
+      "name": "discord",
+      "match": "bun listener.ts",
+      "description": "OmOMeow Discord inbound",
+      "command": "source ~/.nvm/nvm.sh >/dev/null 2>&1; cd ~/.omocat && exec bun listener.ts 2>&1",
+      "filter": "^OMOCAT_(MSG|BUTTON|ERROR|MEMBER_JOIN) "
+    },
+    {
+      "name": "mail-calendar-seo",
+      "match": "bun watch.ts",
+      "description": "OmOMeow mail+calendar+SEO watcher",
+      "command": "source ~/.nvm/nvm.sh >/dev/null 2>&1; cd ~/.omocat && exec bun watch.ts 2>&1",
+      "filter": "^OMOCAT_"
+    },
+    {
+      "name": "dori-sweeps",
+      "match": "dori-monitors.sh",
+      "description": "Dandori dori sweeps + supervisor events through event-router (DORI_ASK now, DORI_DIGEST every 15/60 min)",
+      "command": "bash ~/.omocat/dori-monitors.sh",
+      "filter": "^(DORI_ASK|DORI_DIGEST) "
+    }
+  ]
+}

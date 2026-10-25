@@ -1,0 +1,42 @@
+{
+ "protocolVersion": 1,
+ "serverVersion": "2026.10.19-2",
+ "capabilities": [
+  "tui_control",
+  "session_status"
+ ],
+ "mode": "tui",
+ "endpoint_kind": "tui",
+ "instanceId": "12eed82e-1fd2-49ce-bb39-91587cdb990b",
+ "generation": 0,
+ "engineVersion": "2026.10.19-2",
+ "engineOrdinal": [
+  2026,
+  10,
+  19,
+  2,
+  0
+ ],
+ "commands": [
+  "get_protocol_info",
+  "list_sessions",
+  "get_state",
+  "get_messages",
+  "set_session_name",
+  "subscribe",
+  "wake",
+  "extension_ui_response",
+  "get_available_models",
+  "get_available_thinking_levels",
+  "set_model",
+  "set_thinking_level",
+  "interrupt",
+  "open_session",
+  "subscribe_sessions",
+  "unsubscribe_sessions",
+  "steer",
+  "follow_up",
+  "prompt",
+  "get_effect_status"
+ ]
+}

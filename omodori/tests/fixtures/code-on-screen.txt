@@ -1,0 +1,21 @@
+ ╭─ read ~/.omocat/herdr-watch.ts
+ │ 19  // so also look at the screen for the ask-user prompt.
+ │ 20  const QUESTION_UI = /Ask user · |Submit \(\d+\/\d+ answered\)|↑↓ move .*select/
+ │ 21  const asking = new Set<string>()
+ ╰─
+
+ Here is what the question UI looks like:
+ Ask user · 30m
+ → 색    과일    Submit
+ Submit (0/2 answered) — Enter advances
+ ↑↓ move  1-9 select  space select  enter next  tab next question  c comment  esc
+
+ I will now write the strict detector.
+
+ Todo
+ [•] Read reference repo files and SETUP-PROMPT bugs
+── • Running eval (24s • esc to interrupt) ──────────────────────────────────────────
+❯
+─────────────────────────────────────────────────────────────────────────────────────
+~/.omocat • 152K/1M (15.2%) (auto)    (anthropic-subscription) claude-opus-5-5:medium
+(😺 OmO Native by Q Kim) Pursuing goal (3m) mem:omocat-eb85c2c5 15h ago Claude 92/...

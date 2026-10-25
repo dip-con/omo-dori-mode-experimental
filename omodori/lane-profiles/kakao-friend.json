@@ -1,0 +1,15 @@
+{
+ "//": "친구B방 장도리. Was friend-restart.sh (Opus 5.5 low).",
+ "label": "kakao-친구B방",
+ "cwd": "/Volumes/Data",
+ "thread": null,
+ "ext": [
+  "~/.omocat/kakao-friend-ext.ts"
+ ],
+ "tools": "kakao_send,kakao_recent,kakao_send_image,kakao_view_photo,kakao_profile_photo,web_search,webfetch,generate_image",
+ "model": "anthropic-subscription/claude-opus-5-5",
+ "thinking": "low",
+ "noClaim": true,
+ "briefPath": "~/.omocat/kakao-friend-brief.md",
+ "checkpointOnReset": false
+}

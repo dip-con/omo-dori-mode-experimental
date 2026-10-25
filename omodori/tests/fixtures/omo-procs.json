@@ -1,0 +1,24 @@
+[
+ {
+  "argv": [
+   "/Users/x/.local/bin/aside",
+   "mcp"
+  ],
+  "name": "aside"
+ },
+ {
+  "argv": [
+   "/Users/x/.nvm/versions/node/v24.15.0/lib/node_modules/bun/bin/bun.exe",
+   "/Users/x/.bun/install/global/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js",
+   "--extension",
+   "/Users/x/.bun/install/global/node_modules/omo-ai/plugin",
+   "--model",
+   "chatgpt-subscription/gpt-6-luna-fast",
+   "--thinking",
+   "low",
+   "--session-id",
+   "dce7dc66-7860-4318-8de3-e1d2157db867"
+  ],
+  "name": "bun.exe"
+ }
+]

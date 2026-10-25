@@ -1,0 +1,15 @@
+{
+  "sites": [
+    {
+      "key": "example",
+      "url": "https://example.com",
+      "repo": "~/Work/example-site",
+      "channel": "1000000000000000011",
+      "thread": "1000000000000000021",
+      "session": "example-seo",
+      "weekday": 0,
+      "hour": 9,
+      "started": "2026-01-01"
+    }
+  ]
+}

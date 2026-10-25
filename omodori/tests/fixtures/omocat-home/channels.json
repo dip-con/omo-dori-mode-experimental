@@ -1,0 +1,22 @@
+{
+ "category_id": "1000000000000000010",
+ "projects": {
+  "1000000000000000011": {
+   "key": "side-project",
+   "name": "Side project",
+   "path": "~/Work/side-project",
+   "repo": "(local)",
+   "session": {
+    "mode": "herdr",
+    "key": "side-project",
+    "note": "test fixture"
+   }
+  },
+  "1000000000000000012": {
+   "key": "acme",
+   "name": "acme",
+   "path": "~/Work/acme",
+   "repo": "gitlab.example.com/work/acme"
+  }
+ }
+}

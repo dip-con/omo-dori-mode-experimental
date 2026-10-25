@@ -145,6 +145,10 @@ bunx tsc --noEmit  # typecheck
 
 The tests never touch a real pane, repo or GitHub.
 
+## Discord + KakaoTalk runtime (omodori)
+
+[`omodori/`](omodori/README.md) is the always-on runtime a Dori runs on a Mac: the Discord bot, lane supervisor over omo RPC, KakaoTalk live stream and per-room lanes, decision inbox and self-heal heartbeat. Every per-machine value lives in one `config.json`; `omodori/install.sh` checks the dependencies and renders the LaunchAgents (dry run by default). Porting checklist: [`omodori/docs/PORTING.md`](omodori/docs/PORTING.md).
+
 ## License
 
 MIT

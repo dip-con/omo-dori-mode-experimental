@@ -1,0 +1,70 @@
+# Secrets and credentials (never commit)
+*.env
+daum-mail.env
+prb-admin-key.txt
+*.key
+*.pem
+# Runtime state, databases, chat data, caches
+*.db
+*.db-shm
+*.db-wal
+inbox.jsonl
+sa-cache/
+logs/
+prb-drafts/
+prb-sessions.json
+prb-links.json
+sessions-map.json
+*-state.json
+watch-state.json
+sa-clan.json
+typing/
+backup/
+*.bak-*
+*.bak
+.omo/
+__pycache__/
+node_modules/
+# Voice: local models/venv and recordings
+voice/tts-env/
+voice/node_modules/
+voice/rec/
+voice/*.ogg
+voice/[0-9]*.txt
+voice/cdn-test.txt
+.DS_Store
+# dori-improve: ledger holds owner message text (may include secrets); migrations/handoff state
+ledger.json
+ledger.json.*.tmp
+lane-migrations.jsonl
+
+# dori-redesign supervisor runtime state
+events/
+state/
+flags/
+lane-status.json
+
+# dori-redesign S7 kakao queue db
+kakao-queue.sqlite
+kakao-queue.sqlite-*
+
+# dori-redesign S8 runtime ledgers
+ops/
+lane-transitions.jsonl
+handoffs/
+
+# per-machine config and data (examples/ holds the templates)
+/config.json
+/channels.json
+/kakao-rooms.json
+/seo-sites.json
+/repo-patrol.json
+/owner-profile.md
+/*-brief.md
+/briefs/
+/owner/
+/decisions.jsonl
+/heartbeat/
+/sa-cache/
+/.locks/
+/omo-extensions/dori-guard.ts

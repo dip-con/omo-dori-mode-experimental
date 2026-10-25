@@ -1,0 +1,24 @@
+{
+ "//": "[ACME] 테스트 강비서. Was acme-docs-restart.sh (Opus 5.5 medium, own extension, no tool allowlist). requests.json written in the last 2 min counts as busy; request_index.py runs right before the old session closes.",
+ "label": "[ACME] 테스트 강비서",
+ "cwd": "/Volumes/Data/Outsourcing/acme/doc-templates",
+ "thread": null,
+ "ext": [
+  "~/.omocat/kakao-acme-docs-ext.ts"
+ ],
+ "tools": null,
+ "model": "anthropic-subscription/claude-opus-5-5",
+ "thinking": "medium",
+ "noClaim": true,
+ "briefPath": "~/.omocat/kakao-acme-docs-brief.md",
+ "checkpointOnReset": false,
+ "busyFiles": [
+  "/Volumes/Data/Outsourcing/acme/doc-templates/out/requests.json"
+ ],
+ "beforeClose": [
+  [
+   "python3",
+   "/Volumes/Data/Outsourcing/acme/doc-templates/tools/request_index.py"
+  ]
+ ]
+}

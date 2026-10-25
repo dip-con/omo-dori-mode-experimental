@@ -1,0 +1,16 @@
+{"at":"2026-10-19T23:59:00+09:00","room":"A방","chat":"1","log_id":"1","decision":"skip","reason":"jev","score":0.1,"ms":100,"tokens":1000}
+{"at":"2026-10-20T09:00:00+09:00","room":"A방","chat":"1","log_id":"2","decision":"hard-wake","reason":"name_call","score":null,"ms":0,"tokens":null}
+{"at":"2026-10-20T09:01:00+09:00","room":"A방","chat":"1","log_id":"3","decision":"skip","reason":"jev","score":0.2,"ms":180,"tokens":1700}
+{"at":"2026-10-20T09:05:00+09:00","room":"A방","chat":"1","log_id":"4","decision":"hard-wake","reason":"reply_to_bot","score":null,"ms":0,"tokens":null}
+{"at":"2026-10-20T09:30:00+09:00","room":"A방","chat":"1","log_id":"5","decision":"skip","reason":"reaction","score":null,"ms":0,"tokens":null}
+{"at":"2026-10-20T09:31:00+09:00","room":"A방","chat":"1","log_id":"6","decision":"hard-wake","reason":"name_call","score":null,"ms":0,"tokens":null}
+{"at":"2026-10-20T10:00:00+09:00","room":"A방","chat":"1","log_id":"7","decision":"wake","reason":"jev","score":0.9,"ms":220,"tokens":1800}
+{"at":"2026-10-20T11:00:00+09:00","room":"A방","chat":"1","log_id":"8","decision":"skip","reason":"jev","score":0.1,"ms":200,"tokens":1700}
+{"at":"2026-10-20T11:00:05+09:00","room":"A방","chat":"1","event":"held","lines":2}
+{"at":"2026-10-20T11:20:00+09:00","room":"B방","chat":"2","log_id":"9","decision":"hard-wake","reason":"name_call","score":null,"ms":0,"tokens":null}
+{"at":"2026-10-20T12:00:00+09:00","room":"B방","chat":"2","log_id":"10","decision":"fail-open","reason":"timeout","score":null,"ms":1001,"tokens":null}
+{"at":"2026-10-20T12:01:00+09:00","room":"B방","chat":"2","log_id":"11","decision":"fail-open","reason":"no-key","score":null,"ms":0,"tokens":null}
+not json
+{"at":"2026-10-20T23:55:00+09:00","room":"B방","chat":"2","log_id":"12","decision":"skip","reason":"jev","score":0.3,"ms":160,"tokens":1600}
+{"at":"2026-10-21T00:02:00+09:00","room":"B방","chat":"2","log_id":"13","decision":"hard-wake","reason":"mention","score":null,"ms":0,"tokens":null}
+{"at":"2026-10-21T08:00:00+09:00","room":"B방","chat":"2","log_id":"14","decision":"skip","reason":"jev","score":0.1,"ms":150,"tokens":1500}
